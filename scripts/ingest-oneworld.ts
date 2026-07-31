@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
-import { fetchOneWorld, isCriticalQualityWarning, type NormalizedVacancy } from "../lib/ingestion/oneworld-parser";
+import { fetchOneWorld, fetchOneWorldUrls, matchRepairOccurrence, repairFailureReason, type NormalizedVacancy } from "../lib/ingestion/oneworld-parser";
 
 const db = getDb();
 const [source] = await db.select().from(sources).where(eq(sources.slug, "oneworld"));
@@ -10,12 +10,14 @@ if (!source) throw new Error("Voer eerst pnpm db:seed uit");
 const [run] = await db.insert(sourceRuns).values({ sourceId: source.id }).returning();
 const isRepair = process.argv.includes("--repair");
 
-async function writeSummary(values: { updated: number; unchanged: number; failed: number; duplicates: number; added: number; warnings: string[] }) {
+async function writeSummary(values: { requested: number; parsed: number; updated: number; unchanged: number; failed: number; duplicates: number; added: number; warnings: string[] }) {
   const lines = [
     "## OneWorld repair summary",
     "",
     "| Result | Count |",
     "| --- | ---: |",
+    `| Requested URLs | ${values.requested} |`,
+    `| Parsed pages | ${values.parsed} |`,
     `| Updated | ${values.updated} |`,
     `| Unchanged | ${values.unchanged} |`,
     `| Failed | ${values.failed} |`,
@@ -26,7 +28,8 @@ async function writeSummary(values: { updated: number; unchanged: number; failed
     "",
   ];
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"), "utf8");
-  console.log(`OneWorld summary: updated=${values.updated}, unchanged=${values.unchanged}, failed=${values.failed}, duplicates=${values.duplicates}, added=${values.added}`);
+  console.log(`OneWorld summary: requested=${values.requested}, parsed=${values.parsed}, updated=${values.updated}, unchanged=${values.unchanged}, failed=${values.failed}, duplicates=${values.duplicates}, added=${values.added}`);
+  for (const warning of values.warnings) console.warn(`OneWorld warning: ${warning}`);
 }
 
 function vacancyValues(item: NormalizedVacancy) {
@@ -52,20 +55,39 @@ function vacancyValues(item: NormalizedVacancy) {
 }
 
 try {
-  const { results, warnings, failedCount } = await fetchOneWorld();
-  const failedQualityChecks = failedCount > 0 || warnings.some(isCriticalQualityWarning);
-  // A manually triggered repair is all-or-nothing with respect to extraction quality:
-  // validate the complete fetch before changing any vacancy or occurrence.
-  if (isRepair && failedQualityChecks) {
-    await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: results.length, warnings, error: "OneWorld-kwaliteitscontrole mislukt; er zijn geen vacatures gewijzigd." }).where(eq(sourceRuns.id, run.id));
-    await writeSummary({ updated: 0, unchanged: 0, failed: failedCount, duplicates: 0, added: 0, warnings });
+  const repairOccurrences = isRepair ? await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences })
+    .from(vacancyOccurrences).innerJoin(vacancies, eq(vacancyOccurrences.vacancyId, vacancies.id))
+    .where(eq(vacancyOccurrences.sourceId, source.id)) : [];
+  const repairUrls = repairOccurrences.map(({ occurrence }) => occurrence.sourceUrl);
+  const fetched = isRepair ? await fetchOneWorldUrls(repairUrls) : await fetchOneWorld();
+  const { results, failedCount, requestedCount } = fetched;
+  const warnings = [...fetched.warnings];
+  const repairFailure = isRepair ? repairFailureReason(requestedCount, results.length, failedCount, warnings) : null;
+  // Validate the complete batch before changing any vacancy or occurrence.
+  if (repairFailure) {
+    warnings.push(repairFailure);
+    await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: results.length, warnings, error: `${repairFailure} Er zijn geen vacatures gewijzigd.` }).where(eq(sourceRuns.id, run.id));
+    await writeSummary({ requested: requestedCount, parsed: results.length, updated: 0, unchanged: 0, failed: failedCount, duplicates: repairUrls.length - requestedCount, added: 0, warnings });
     throw new Error("OneWorld-reparatie afgebroken vóór databasewijzigingen. Bekijk het workflowoverzicht.");
   }
   let added = 0;
   let changed = 0;
   let unchanged = 0;
-  let duplicates = 0;
+  let duplicates = isRepair ? repairUrls.length - requestedCount : 0;
   for (const item of results) {
+    if (isRepair) {
+      const matched = matchRepairOccurrence(item, repairOccurrences.map(({ occurrence }) => occurrence));
+      if (!matched) {
+        warnings.push(`${item.sourceUrl}: geen bestaande OneWorld-occurrence gevonden; overgeslagen zonder nieuwe vacature.`);
+        continue;
+      }
+      const existing = repairOccurrences.find(({ occurrence }) => occurrence.id === matched.id)!;
+      if (existing.vacancy.contentHash !== item.contentHash || existing.vacancy.canonicalKey !== item.canonicalKey) changed++;
+      else unchanged++;
+      await db.update(vacancies).set({ ...vacancyValues(item), lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(vacancies.id, existing.vacancy.id));
+      await db.update(vacancyOccurrences).set({ sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, matched.id));
+      continue;
+    }
     // Identity is deliberately resolved before canonical data: corrected employer/title must
     // repair the vacancy attached to the source occurrence rather than create a duplicate.
     const [byExternalId] = item.externalId ? await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences })
@@ -99,7 +121,7 @@ try {
     }
   }
   await db.update(sourceRuns).set({ status: warnings.length ? "warning" : "success", finishedAt: new Date(), resultCount: results.length, newCount: added, changedCount: changed, warnings }).where(eq(sourceRuns.id, run.id));
-  await writeSummary({ updated: changed, unchanged, failed: failedCount, duplicates, added, warnings });
+  await writeSummary({ requested: requestedCount, parsed: results.length, updated: changed, unchanged, failed: failedCount, duplicates, added, warnings });
 } catch (error) {
   await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), error: error instanceof Error ? error.message : "Onbekende fout" }).where(eq(sourceRuns.id, run.id));
   throw error;

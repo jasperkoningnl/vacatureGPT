@@ -129,20 +129,24 @@ export function parseDetail(html: string, sourceUrl: string): NormalizedVacancy 
   const title = decode(job.title || $("h1").first().text() || $('meta[property="og:title"]').attr("content"));
   const organization = job.hiringOrganization && typeof job.hiringOrganization === "object" ? job.hiringOrganization as JsonObject : undefined;
   const otherOrganization = structured.find((object) => typeIs(object, "Organization") && clean(object.name) && clean(object.name).toLowerCase() !== "oneworld");
-  const employer = decode(organization?.name || otherOrganization?.name || $(".wpjb-company_name, .wpjb-company-name, [itemprop='hiringOrganization'] [itemprop='name'], .company-name, .vacature-organisatie").first().text()) || UNKNOWN_EMPLOYER;
+  const employer = decode(organization?.name || otherOrganization?.name || $(".wpjb-top-header-title, .wpjb-company_name, .wpjb-company-name, [itemprop='hiringOrganization'] [itemprop='name'], .company-name, .vacature-organisatie").first().text()) || UNKNOWN_EMPLOYER;
   const address = job.jobLocation && typeof job.jobLocation === "object" ? (job.jobLocation as JsonObject).address : undefined;
   const jsonLocation = address && typeof address === "object" ? clean((address as JsonObject).addressLocality) : "";
   const location = decode(labels.get("locatie") || jsonLocation) || null;
 
   const labelledHours = parseHours(labels.get("tijd per week") ?? "");
   const jsonHours = parseHours(clean(job.workHours));
-  const hoursFallbackText = description.split(/(?<=[.!?])\s+/).filter((sentence) => !/€|EUR\b/i.test(sentence)).join(" ");
-  const descriptionHours = parseHours(hoursFallbackText);
+  const descriptionHours = description.split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !/€|EUR\b/i.test(sentence))
+    .map(parseHours).find((candidate) => candidate !== null) ?? null;
   const hours = labelledHours || jsonHours || descriptionHours;
   const warnings: string[] = [];
   if (labelledHours) {
     for (const [source, candidate] of [["JSON-LD", jsonHours], ["beschrijving", descriptionHours]] as const) {
-      if (candidate && (candidate.min !== labelledHours.min || candidate.max !== labelledHours.max)) warnings.push(`Tijd per week (${labelledHours.original}) conflicteert met ${source} (${candidate.original}).`);
+      if (candidate && (candidate.min !== labelledHours.min || candidate.max !== labelledHours.max)) {
+        const detail = candidate.original.length > 160 ? `${candidate.original.slice(0, 157)}...` : candidate.original;
+        warnings.push(`Tijd per week (${labelledHours.original}) conflicteert met ${source} (${detail}).`);
+      }
     }
   }
 
@@ -185,19 +189,50 @@ export function isCriticalQualityWarning(warning: string) {
   return /Kwaliteitswaarschuwing|onverwacht nul resultaten|geen bruikbare metadata|gecodeerde HTML-entiteit/i.test(warning);
 }
 
-export async function fetchOneWorld(fetcher: typeof fetch = fetch) {
-  const rss = await fetcher(RSS_URL, { headers: { "user-agent": "VacatureGPT/1.0 personal vacancy search" } });
-  if (!rss.ok) throw new Error(`OneWorld RSS gaf HTTP ${rss.status}`);
-  const entries = parseRss(await rss.text());
+const ONE_WORLD_USER_AGENT = "VacatureGPT/1.0 personal vacancy search";
+const detailDelay = () => new Promise((resolve) => setTimeout(resolve, process.env.NODE_ENV === "test" ? 0 : 1100));
+
+/** Fetches only the supplied vacancy pages. This is deliberately independent of RSS so
+ * existing occurrences can still be repaired when discovery is unavailable. */
+export async function fetchOneWorldUrls(urls: string[], fetcher: typeof fetch = fetch) {
+  const uniqueUrls = [...new Set(urls)];
   const results: NormalizedVacancy[] = [];
   const fetchWarnings: string[] = [];
-  for (const entry of entries) {
-    await new Promise((resolve) => setTimeout(resolve, process.env.NODE_ENV === "test" ? 0 : 1100));
+  for (const url of uniqueUrls) {
+    await detailDelay();
     try {
-      const response = await fetcher(entry.url, { headers: { "user-agent": "VacatureGPT/1.0 personal vacancy search" } });
+      const response = await fetcher(url, { headers: { "user-agent": ONE_WORLD_USER_AGENT } });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      results.push(parseDetail(await response.text(), entry.url));
-    } catch (error) { fetchWarnings.push(`${entry.url}: ${error instanceof Error ? error.message : "parseerfout"}`); }
+      results.push(parseDetail(await response.text(), url));
+    } catch (error) {
+      fetchWarnings.push(`${url}: ${error instanceof Error ? error.message : "parseerfout"}`);
+    }
   }
-  return { results, warnings: [...fetchWarnings, ...qualityWarnings(results)], failedCount: fetchWarnings.length };
+  return {
+    results,
+    warnings: [...fetchWarnings, ...qualityWarnings(results)],
+    failedCount: fetchWarnings.length,
+    requestedCount: uniqueUrls.length,
+  };
+}
+
+export function repairFailureReason(requestedCount: number, parsedCount: number, failedCount: number, warnings: string[]) {
+  if (requestedCount === 0) return "De database bevat geen bestaande OneWorld-URL's.";
+  if (parsedCount === 0) return "Geen enkele OneWorld-detailpagina kon worden geparseerd.";
+  if (failedCount / requestedCount > 0.5) return "Meer dan 50% van de OneWorld-detailpagina's is mislukt.";
+  if (warnings.some(isCriticalQualityWarning)) return "De bestaande kritieke kwaliteitscontroles zijn mislukt.";
+  return null;
+}
+
+export function matchRepairOccurrence<T extends { externalId: string | null; sourceUrl: string }>(item: NormalizedVacancy, occurrences: T[]) {
+  return item.externalId
+    ? occurrences.find((occurrence) => occurrence.externalId === item.externalId)
+    : occurrences.find((occurrence) => occurrence.sourceUrl === item.sourceUrl);
+}
+
+export async function fetchOneWorld(fetcher: typeof fetch = fetch) {
+  const rss = await fetcher(RSS_URL, { headers: { "user-agent": ONE_WORLD_USER_AGENT } });
+  if (!rss.ok) throw new Error(`OneWorld RSS gaf HTTP ${rss.status}`);
+  const entries = parseRss(await rss.text());
+  return fetchOneWorldUrls(entries.map((entry) => entry.url), fetcher);
 }
