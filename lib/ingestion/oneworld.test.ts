@@ -23,6 +23,24 @@ describe("OneWorld parser", () => {
     expect(parseDetail(fixture("oneworld-filantropie.html"), "https://www.oneworld.nl/job/filantropie-expert/")).toMatchObject({ location: "Den Haag", hoursMin: 32, hoursMax: 36 });
   });
 
+  it("leest de werkgever uit de huidige OneWorld vacaturekop als JSON-LD die naam leeg laat", () => {
+    const html = `
+      <h1>Digital Growth Marketeer</h1>
+      <div class="wpjb-top-header"><span class="wpjb-top-header-title"><a href="/company/actionaid/">ActionAid</a></span></div>
+      <div class="wpjb-grid-row"><div class="wpjb-grid-col">Tijd per week</div><div class="wpjb-grid-col">32-36 uur</div></div>
+      <div class="wpjb-text-box">Een betekenisvolle vacaturetekst.</div>
+      <script type="application/ld+json">{"@type":"JobPosting","title":"Digital Growth Marketeer","hiringOrganization":{"@type":"Organization","name":""}}</script>`;
+    expect(parseDetail(html, "https://www.oneworld.nl/job/digital-growth-marketeer/").employer).toBe("ActionAid");
+  });
+
+  it("begrenst lange urenconflicten in waarschuwingen", () => {
+    const longDescription = `Deze ${"uitgebreide tekst ".repeat(30)}noemt uiteindelijk 38 uur per week.`;
+    const html = `<h1>Rol</h1><div class="wpjb-top-header-title">Werkgever</div><dl><dt>Tijd per week</dt><dd>32-36 uur</dd></dl><script type="application/ld+json">${JSON.stringify({ "@type": "JobPosting", title: "Rol", description: longDescription })}</script>`;
+    const [warning] = parseDetail(html, "https://example.test/rol").warnings;
+    expect(warning).toContain("conflicteert met beschrijving");
+    expect(warning.length).toBeLessThan(250);
+  });
+
   it("decodeert entiteiten en parseert Nederlands salaris", () => {
     const result = parseDetail(fixture("oneworld-college53.html"), "https://www.oneworld.nl/job/programmaleider-educatief-jongerencentrum-college53/");
     expect(result).toMatchObject({ title: "Programmaleider Educatief Jongerencentrum College53 & Partners", employer: "Stichting & College53", location: "Rotterdam", hoursMin: 24, hoursMax: 30, salaryMin: 4200, salaryMax: 5000 });

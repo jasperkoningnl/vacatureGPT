@@ -129,20 +129,24 @@ export function parseDetail(html: string, sourceUrl: string): NormalizedVacancy 
   const title = decode(job.title || $("h1").first().text() || $('meta[property="og:title"]').attr("content"));
   const organization = job.hiringOrganization && typeof job.hiringOrganization === "object" ? job.hiringOrganization as JsonObject : undefined;
   const otherOrganization = structured.find((object) => typeIs(object, "Organization") && clean(object.name) && clean(object.name).toLowerCase() !== "oneworld");
-  const employer = decode(organization?.name || otherOrganization?.name || $(".wpjb-company_name, .wpjb-company-name, [itemprop='hiringOrganization'] [itemprop='name'], .company-name, .vacature-organisatie").first().text()) || UNKNOWN_EMPLOYER;
+  const employer = decode(organization?.name || otherOrganization?.name || $(".wpjb-top-header-title, .wpjb-company_name, .wpjb-company-name, [itemprop='hiringOrganization'] [itemprop='name'], .company-name, .vacature-organisatie").first().text()) || UNKNOWN_EMPLOYER;
   const address = job.jobLocation && typeof job.jobLocation === "object" ? (job.jobLocation as JsonObject).address : undefined;
   const jsonLocation = address && typeof address === "object" ? clean((address as JsonObject).addressLocality) : "";
   const location = decode(labels.get("locatie") || jsonLocation) || null;
 
   const labelledHours = parseHours(labels.get("tijd per week") ?? "");
   const jsonHours = parseHours(clean(job.workHours));
-  const hoursFallbackText = description.split(/(?<=[.!?])\s+/).filter((sentence) => !/€|EUR\b/i.test(sentence)).join(" ");
-  const descriptionHours = parseHours(hoursFallbackText);
+  const descriptionHours = description.split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !/€|EUR\b/i.test(sentence))
+    .map(parseHours).find((candidate) => candidate !== null) ?? null;
   const hours = labelledHours || jsonHours || descriptionHours;
   const warnings: string[] = [];
   if (labelledHours) {
     for (const [source, candidate] of [["JSON-LD", jsonHours], ["beschrijving", descriptionHours]] as const) {
-      if (candidate && (candidate.min !== labelledHours.min || candidate.max !== labelledHours.max)) warnings.push(`Tijd per week (${labelledHours.original}) conflicteert met ${source} (${candidate.original}).`);
+      if (candidate && (candidate.min !== labelledHours.min || candidate.max !== labelledHours.max)) {
+        const detail = candidate.original.length > 160 ? `${candidate.original.slice(0, 157)}...` : candidate.original;
+        warnings.push(`Tijd per week (${labelledHours.original}) conflicteert met ${source} (${detail}).`);
+      }
     }
   }
 
