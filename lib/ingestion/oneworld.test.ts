@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parseDetail, parseHours, parseRss, parseSalary, qualityWarnings } from "./oneworld";
+import { parseDetail, parseHours, parseRss, parseSalary, qualityWarnings } from "./oneworld-parser";
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 

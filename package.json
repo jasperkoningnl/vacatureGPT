@@ -12,9 +12,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "ingest": "tsx scripts/ingest.ts",
-    "ingest:oneworld": "tsx scripts/ingest.ts oneworld",
-    "repair:oneworld": "tsx scripts/ingest.ts oneworld --repair"
+    "ingest": "tsx scripts/ingest-oneworld.ts",
+    "ingest:oneworld": "tsx scripts/ingest-oneworld.ts",
+    "repair:oneworld": "tsx scripts/ingest-oneworld.ts --repair"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
