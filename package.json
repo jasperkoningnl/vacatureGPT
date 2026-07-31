@@ -14,7 +14,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "ingest": "tsx scripts/ingest-oneworld.ts",
     "ingest:oneworld": "tsx scripts/ingest-oneworld.ts",
-    "repair:oneworld": "tsx scripts/ingest-oneworld.ts --repair"
+    "repair:oneworld": "tsx scripts/ingest-oneworld.ts --repair",
+    "ingest:villamedia": "tsx scripts/ingest-villamedia.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
