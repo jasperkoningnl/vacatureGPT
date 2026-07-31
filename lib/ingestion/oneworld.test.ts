@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
-import { parseDetail, parseHours, parseRss, parseSalary, qualityWarnings } from "./oneworld-parser";
+import { describe, expect, it, vi } from "vitest";
+import { RSS_URL, fetchOneWorldUrls, matchRepairOccurrence, parseDetail, parseHours, parseRss, parseSalary, qualityWarnings, repairFailureReason } from "./oneworld-parser";
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 
@@ -50,5 +50,48 @@ describe("OneWorld parser", () => {
   it("maakt batchbrede kwaliteitswaarschuwingen", () => {
     const base = parseDetail(fixture("oneworld-filantropie.html"), "https://example.test/1");
     expect(qualityWarnings([{ ...base, employer: "Onbekende werkgever", hoursMin: null }, { ...base, employer: "Onbekende werkgever", hoursMin: null }, base])).toEqual(expect.arrayContaining([expect.stringContaining("onbekende werkgever"), expect.stringContaining("onbekende uren")]));
+  });
+
+  it("haalt aangeleverde repair-URL's op zonder de RSS-endpoint te gebruiken", async () => {
+    const url = "https://www.oneworld.nl/job/filantropie-expert/";
+    const fetcher = vi.fn(async () => new Response(fixture("oneworld-filantropie.html"), { status: 200 })) as unknown as typeof fetch;
+    const result = await fetchOneWorldUrls([url], fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledWith(url, expect.any(Object));
+    expect(fetcher).not.toHaveBeenCalledWith(RSS_URL, expect.anything());
+    expect(result).toMatchObject({ requestedCount: 1, failedCount: 0 });
+    expect(result.results[0]).toMatchObject({ sourceUrl: url, employer: "Goede Doelen Nederland" });
+  });
+
+  it("behoudt geslaagde repair-pagina's als één detailpagina faalt", async () => {
+    const goodUrl = "https://www.oneworld.nl/job/filantropie-expert/";
+    const badUrl = "https://www.oneworld.nl/job/verwijderd/";
+    const fetcher = vi.fn(async (input: string | URL | Request) => String(input) === badUrl
+      ? new Response("missing", { status: 404 })
+      : new Response(fixture("oneworld-filantropie.html"), { status: 200 })) as unknown as typeof fetch;
+    const result = await fetchOneWorldUrls([goodUrl, badUrl], fetcher);
+    expect(result.results).toHaveLength(1);
+    expect(result).toMatchObject({ requestedCount: 2, failedCount: 1 });
+    expect(result.warnings).toContain(`${badUrl}: HTTP 404`);
+    expect(repairFailureReason(result.requestedCount, result.results.length, result.failedCount, result.warnings)).toBeNull();
+  });
+
+  it("weigert een repair als alle detailpagina's mislukken", async () => {
+    const result = await fetchOneWorldUrls(["https://www.oneworld.nl/job/verwijderd/"], async () => new Response("missing", { status: 500 }));
+    expect(result.results).toHaveLength(0);
+    expect(repairFailureReason(result.requestedCount, result.results.length, result.failedCount, result.warnings)).toContain("Geen enkele");
+  });
+
+  it("maakt bij repair geen nieuwe vacature voor een onverwacht niet-gematchte pagina", () => {
+    const item = parseDetail(fixture("oneworld-filantropie.html"), "https://www.oneworld.nl/job/nieuw/");
+    expect(matchRepairOccurrence(item, [{ externalId: "ander-id", sourceUrl: "https://www.oneworld.nl/job/bestaand/" }])).toBeUndefined();
+  });
+
+  it("haalt dubbele aangeleverde repair-URL's maar één keer op", async () => {
+    const url = "https://www.oneworld.nl/job/filantropie-expert/";
+    const fetcher = vi.fn(async () => new Response(fixture("oneworld-filantropie.html"), { status: 200 })) as unknown as typeof fetch;
+    const result = await fetchOneWorldUrls([url, url], fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ requestedCount: 1, failedCount: 0 });
   });
 });
