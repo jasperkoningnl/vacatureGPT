@@ -13,7 +13,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "ingest": "tsx scripts/ingest.ts",
-    "ingest:oneworld": "tsx scripts/ingest.ts oneworld"
+    "ingest:oneworld": "tsx scripts/ingest.ts oneworld",
+    "repair:oneworld": "tsx scripts/ingest.ts oneworld --repair"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

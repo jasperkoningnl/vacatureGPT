@@ -20,11 +20,19 @@ Een compacte, privé vacaturezoeker. De app haalt betaalde functies van OneWorld
 
 `pnpm db:migrate` past uitsluitend versiebeheer-migraties toe; het verwijdert geen schema's of andere tabellen. `pnpm db:seed` is herhaalbaar en voegt de bron, standaardvoorkeuren en gevolgde werkgevers toe. `pnpm ingest` en `pnpm ingest:oneworld` voeren de OneWorld-adapter uit. Controles: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 
+Na deployment van de parser en migratie repareer je de bestaande OneWorld-records eenmalig met:
+
+```bash
+pnpm repair:oneworld
+```
+
+Deze import koppelt eerst op het externe OneWorld-ID, daarna op de exacte bron-URL en pas daarna op de conservatieve canonieke sleutel. Feedback, eerste vinddatum en bronhistorie blijven daardoor aan dezelfde vacature gekoppeld.
+
 ## OneWorld en gegevenskwaliteit
 
 De adapter gebruikt de publieke, gefilterde RSS-feed en vervolgens de JSON-LD `JobPosting` op detailpagina's. Dat is stabieler dan de zoekresultaten scrapen. De crawler gebruikt een herkenbare user-agent en wacht minimaal 1,1 seconde tussen detailverzoeken, in lijn met `robots.txt` (`Crawl-delay: 1`). RSS bevat geen paginering: de feed zelf levert de complete actuele set. Parseerfouten en onverwacht nul resultaten worden als zichtbare waarschuwing bij de bronrun opgeslagen. Werkgever, salaris of andere ontbrekende data worden niet afgeleid of verzonnen.
 
-Deduplicatie gebruikt conservatief titel + werkgever + locatie; iedere vindplaats blijft daarnaast apart bewaard. Een SHA-256-hash van de gestructureerde brondata bepaalt of een bestaande vacature gewijzigd is. Fixtures in `lib/ingestion/fixtures` zijn snapshots; tests doen nooit live verzoeken.
+Deduplicatie gebruikt bronidentiteit vóór conservatief titel + werkgever + locatie; iedere vindplaats blijft daarnaast apart bewaard. Een SHA-256-hash van de gestructureerde brondata bepaalt of een bestaande vacature gewijzigd is. Fixtures in `lib/ingestion/fixtures` zijn snapshots; tests doen nooit live verzoeken.
 
 ## Productie
 
