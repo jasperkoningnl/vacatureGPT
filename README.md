@@ -2,7 +2,7 @@
 
 Een compacte, privé vacaturezoeker. De app haalt betaalde functies van OneWorld op, bewaart brondata en genormaliseerde velden in Neon PostgreSQL en laat je voorkeuren en feedback vastleggen. Er worden nog geen AI-diensten aangeroepen.
 
-## Lokaal starten
+## Ontwikkelaars: lokaal starten
 
 1. Installeer Node.js 20+ en pnpm 10.
 2. Kopieer `.env.example` naar `.env.local` en vul de Neon `DATABASE_URL`, een eigen `APP_PASSWORD` en een willekeurige `SESSION_SECRET` van minimaal 32 tekens in. Deel of commit deze waarden nooit.
@@ -16,7 +16,7 @@ Een compacte, privé vacaturezoeker. De app haalt betaalde functies van OneWorld
    ```
 4. Open `http://localhost:3000` en log in met `APP_PASSWORD`.
 
-## Commando's
+## Ontwikkelaars: commando's
 
 `pnpm db:migrate` past uitsluitend versiebeheer-migraties toe; het verwijdert geen schema's of andere tabellen. `pnpm db:seed` is herhaalbaar en voegt de bron, standaardvoorkeuren en gevolgde werkgevers toe. `pnpm ingest` en `pnpm ingest:oneworld` voeren de OneWorld-adapter uit. Controles: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 

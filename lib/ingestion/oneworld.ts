@@ -179,6 +179,12 @@ export function qualityWarnings(results: NormalizedVacancy[]) {
   return warnings;
 }
 
+/** Warnings that make a production repair unsafe to apply. Hour-range conflicts are
+ * retained for auditability, but do not reject a record because labelled hours win. */
+export function isCriticalQualityWarning(warning: string) {
+  return /Kwaliteitswaarschuwing|onverwacht nul resultaten|geen bruikbare metadata|gecodeerde HTML-entiteit/i.test(warning);
+}
+
 export async function fetchOneWorld(fetcher: typeof fetch = fetch) {
   const rss = await fetcher(RSS_URL, { headers: { "user-agent": "VacatureGPT/1.0 personal vacancy search" } });
   if (!rss.ok) throw new Error(`OneWorld RSS gaf HTTP ${rss.status}`);

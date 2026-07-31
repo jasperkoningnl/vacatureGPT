@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
-import { fetchOneWorld, type NormalizedVacancy } from "../lib/ingestion/oneworld";
+import { fetchOneWorld, isCriticalQualityWarning, type NormalizedVacancy } from "../lib/ingestion/oneworld";
 
 const db = getDb();
 const [source] = await db.select().from(sources).where(eq(sources.slug, "oneworld"));
@@ -53,6 +53,14 @@ function vacancyValues(item: NormalizedVacancy) {
 
 try {
   const { results, warnings, failedCount } = await fetchOneWorld();
+  const failedQualityChecks = failedCount > 0 || warnings.some(isCriticalQualityWarning);
+  // A manually triggered repair is all-or-nothing with respect to extraction quality:
+  // validate the complete fetch before changing any vacancy or occurrence.
+  if (isRepair && failedQualityChecks) {
+    await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: results.length, warnings, error: "OneWorld-kwaliteitscontrole mislukt; er zijn geen vacatures gewijzigd." }).where(eq(sourceRuns.id, run.id));
+    await writeSummary({ updated: 0, unchanged: 0, failed: failedCount, duplicates: 0, added: 0, warnings });
+    throw new Error("OneWorld-reparatie afgebroken vóór databasewijzigingen. Bekijk het workflowoverzicht.");
+  }
   let added = 0;
   let changed = 0;
   let unchanged = 0;
@@ -92,8 +100,6 @@ try {
   }
   await db.update(sourceRuns).set({ status: warnings.length ? "warning" : "success", finishedAt: new Date(), resultCount: results.length, newCount: added, changedCount: changed, warnings }).where(eq(sourceRuns.id, run.id));
   await writeSummary({ updated: changed, unchanged, failed: failedCount, duplicates, added, warnings });
-  const failedQualityChecks = failedCount > 0 || warnings.some((warning) => /Kwaliteitswaarschuwing|onverwacht nul resultaten|geen bruikbare metadata|gecodeerde HTML-entiteit/i.test(warning));
-  if (isRepair && failedQualityChecks) throw new Error("OneWorld-reparatie is uitgevoerd, maar een of meer kwaliteitscontroles zijn mislukt. Bekijk het workflowoverzicht.");
 } catch (error) {
   await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), error: error instanceof Error ? error.message : "Onbekende fout" }).where(eq(sourceRuns.id, run.id));
   throw error;
