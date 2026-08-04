@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
+import { extractSalary } from "./shared/salary-parser";
 import { describe, expect, it, vi } from "vitest";
-import { discoverVillamedia, matchVillamediaOccurrence, parseOverview, parseVillamediaDetail, parseVillamediaHours, parseVillamediaSalary, VILLAMEDIA_OVERVIEW_URL, type OverviewVacancy } from "./villamedia-parser";
+import { discoverVillamedia, matchVillamediaOccurrence, parseOverview, parseVillamediaDetail, parseVillamediaHours, VILLAMEDIA_OVERVIEW_URL, type OverviewVacancy } from "./villamedia-parser";
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 const overview = parseOverview(fixture("villamedia-overview.html"));
 const entry = (id: string) => overview.vacancies.find((item) => item.externalId === id)!;
@@ -45,7 +46,27 @@ describe("Villamedia parser", () => {
     expect(parseVillamediaHours("32 – 36 uur per week")).toMatchObject({ min: 32, max: 36 });
     expect(parseVillamediaHours("vier of vijf dagen per week")).toEqual({ min: null, max: null, original: "vier of vijf dagen per week" });
   });
-  it("kiest een precieze salariszin en rondt centen", () => expect(parseVillamediaSalary(["€ 3.768 - € 4.897 per maand", "Het salaris bedraagt € 3.768,00 tot € 4.897,00 bij 36 uur", "reiskostenvergoeding € 367,50"])).toMatchObject({ min: 3768, max: 4897, basisHours: 36 }));
+  it("kiest een precieze salariszin en rondt centen", () => expect(extractSalary(["€ 3.768 - € 4.897 per maand", "Het salaris bedraagt € 3.768,00 tot € 4.897,00 bij 36 uur", "reiskostenvergoeding € 367,50"])).toMatchObject({ min: 3768, max: 4897, basisHours: 36 }));
+  it.each([
+    ["villamedia-zakelijk-medewerker-productiehuis.html", "zakelijk-medewerker-productiehuis-9dw2", { status: "numeric", salaryMin: 3075, salaryMax: 3610, salaryPeriod: "month", salaryBasisHours: null, isStage: false }],
+    ["villamedia-directeur-bestuurder-omr.html", "directeur-bestuurder-omr-lekstroom", { status: "none", salaryMin: null, salaryMax: null, salaryOriginal: null, isStage: false }],
+    ["villamedia-stage-creatieve-student.html", "stage-creatieve-student-journalistiek-0d2", { status: "none", salaryMin: null, salaryMax: null, isStage: true }],
+    ["villamedia-buitenlandredacteuren.html", "buitenlandredacteuren-algemeen-en-midden-oosten", { status: "numeric", salaryMin: 3449, salaryMax: 5056, salaryPeriod: "month", isStage: false }],
+    ["villamedia-hoofdredacteur-centraal.html", "hoofdredacteur-centraal", { status: "qualitative", salaryMin: null, salaryMax: null, isStage: false }],
+  ])("regressie voor live fixture %s", (file, slug, expected) => {
+    const sourceUrl = `https://www.villamedia.nl/vacatures/functie/${slug}`;
+    const result = parseVillamediaDetail(fixture(file), { sourceUrl, title: "", employer: "", city: null });
+    const { status, ...fields } = expected;
+    expect(result).toMatchObject(fields);
+    expect((result.rawData as { extracted: { salaryStatus: string } }).extracted.salaryStatus).toBe(status);
+    if (expected.status === "qualitative") {
+      expect(result.salaryOriginal).toContain("Salaris afhankelijk van kennis");
+      expect(result.salaryOriginal).toContain("Salarisindicatie: Arbeidsvoorwaarden");
+    }
+    if (slug.startsWith("zakelijk")) expect(result.salaryOriginal).toContain("op basis van fulltime");
+    if (slug.startsWith("buitenland")) expect(result.salaryOriginal).not.toContain("€52");
+  });
+
   it("matcht veilig in identiteitsvolgorde en een rerun blijft dezelfde vacature", () => {
     const item = { externalId: "42", sourceUrl: "https://www.villamedia.nl/vacatures/functie/nieuw", canonicalKey: "new" };
     const rows = [{ externalId: "42", sourceUrl: "https://www.villamedia.nl/vacatures/functie/oud", vacancyId: 7, canonicalKey: "old" }];
