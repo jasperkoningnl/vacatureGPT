@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
+import { detectStage, extractSalary } from "./shared/salary-parser";
 
 export const VILLAMEDIA_BASE_URL = "https://www.villamedia.nl";
 export const VILLAMEDIA_OVERVIEW_URL = `${VILLAMEDIA_BASE_URL}/vacatures`;
@@ -12,7 +13,7 @@ export type VillamediaVacancy = {
   hoursMin: number | null; hoursMax: number | null; hoursOriginal: string | null;
   salaryMin: number | null; salaryMax: number | null; salaryPeriod: "month" | "year" | "hour" | null;
   salaryBasisHours: number | null; salaryOriginal: string | null; deadline: Date | null;
-  originalText: string; rawData: unknown; contentHash: string; canonicalKey: string; warnings: string[];
+  originalText: string; rawData: unknown; contentHash: string; canonicalKey: string; warnings: string[]; isStage: boolean;
 };
 
 const clean = (value: unknown) => String(value ?? "").replace(/\s+/g, " ").trim();
@@ -86,27 +87,6 @@ export function parseVillamediaHours(body: string) {
   return ambiguous ? { min: null, max: null, original: clean(ambiguous[0]) } : null;
 }
 
-function euro(value: string) {
-  const normalized = value.replace(/\s/g, "");
-  if (normalized.includes(",")) return Math.round(Number(normalized.replace(/\./g, "").replace(",", ".")));
-  return Number(normalized.replace(/\./g, ""));
-}
-export function parseVillamediaSalary(lines: string[]) {
-  const amount = "(\\d{1,3}(?:\\.\\d{3})+(?:,\\d{1,2})?|\\d{4,6}(?:,\\d{1,2})?)";
-  const rangeRegex = new RegExp(`€\\s*${amount}\\s*(?:-|–|—|tot|en)\\s*€?\\s*${amount}`, "i");
-  const candidates = lines.map(clean).filter((line) => /€/.test(line) && !/reiskosten|vergoeding|thuiswerk|kilometer|budget|opleidingsbudget/i.test(line));
-  const explicit = candidates.filter((line) => /salaris|maandsalaris|bruto|inschaling|schaal|beloning|verdient/i.test(line));
-  const ranked = [...explicit.sort((a, b) => (b.match(/,\d{2}/g)?.length ?? 0) - (a.match(/,\d{2}/g)?.length ?? 0)), ...candidates.filter((line) => !explicit.includes(line))];
-  for (const original of ranked) {
-    const range = rangeRegex.exec(original);
-    if (!range) continue;
-    const period = /per maand|maandsalaris/i.test(original) || candidates.some((line) => /per maand|maandsalaris/i.test(line)) ? "month" as const : /per jaar/i.test(original) ? "year" as const : /per uur/i.test(original) ? "hour" as const : null;
-    const basis = original.match(/(?:basis van|bij|voor)\s+(?:een\s+)?(\d{1,2})[- ]?(?:urige|uur)\s*(?:werkweek)?/i);
-    return { min: euro(range[1]), max: euro(range[2]), period, basisHours: basis ? Number(basis[1]) : null, original };
-  }
-  return null;
-}
-
 function fallbackDeadline(body: string) {
   const match = body.match(/(?:reageren tot(?: en met)?|uiterlijk)\s+(\d{1,2})\s+(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)(?:\s+(20\d{2}))?/i);
   if (!match) return null;
@@ -121,7 +101,9 @@ export function parseVillamediaDetail(html: string, overview: OverviewVacancy): 
   $('script[type="application/ld+json"]').each((_, node) => { try { structured.push(...jsonObjects(JSON.parse($(node).text()))); } catch { /* Ignore malformed independent blocks. */ } });
   const job = structured.find((object) => typeIs(object, "JobPosting")) ?? {};
   const article = $(".article.vacature").first();
-  const bodyNode = article.find(".text").filter((_, node) => clean($(node).text()).length > 0).first();
+  const bodyNodes = article.find(".text").toArray().filter((node) => clean($(node).text()).length > 0)
+    .sort((a, b) => clean($(b).text()).length - clean($(a).text()).length);
+  const bodyNode = $(bodyNodes[0]);
   const originalText = decode(bodyNode.text());
   const meta = decode(article.find("p.meta").first().text());
   const metaParts = meta.split(",").map(clean).filter(Boolean);
@@ -135,20 +117,22 @@ export function parseVillamediaDetail(html: string, overview: OverviewVacancy): 
   const deadlineValue = clean(job.validThrough);
   const deadline = deadlineValue && !Number.isNaN(Date.parse(deadlineValue)) ? new Date(deadlineValue) : fallbackDeadline(originalText);
   const hours = parseVillamediaHours(originalText);
-  const salaryLines = bodyNode.find("p, li").toArray().map((node) => decode($(node).text()));
-  const salary = parseVillamediaSalary(salaryLines);
+  const evidenceBlocks = bodyNode.find("p, li").toArray().map((node) => decode($(node).text())).filter(Boolean);
+  const salary = extractSalary(evidenceBlocks);
+  const isStage = detectStage(title, evidenceBlocks);
   const warnings: string[] = [];
   if (!title) warnings.push("Titel ontbreekt.");
   if (!employer) warnings.push("Werkgever ontbreekt.");
   if (!(overview.externalId || identifier)) warnings.push("Extern ID ontbreekt.");
-  const rawData = { job, overview, extracted: { hoursOriginal: hours?.original ?? null, salaryOriginal: salary?.original ?? null }, parserWarnings: warnings };
+  warnings.push(...salary.warnings);
+  const rawData = { job, overview, extracted: { hoursOriginal: hours?.original ?? null, salaryOriginal: salary.original, salaryStatus: salary.status, salaryWarnings: salary.warnings, isStage }, parserWarnings: warnings };
   const stable = `${title.toLowerCase()}|${employer.toLowerCase()}|${(location ?? "").toLowerCase()}`;
   return {
     externalId: overview.externalId || identifier || undefined, sourceUrl: overview.sourceUrl, title, employer, location,
     hoursMin: hours?.min ?? null, hoursMax: hours?.max ?? null, hoursOriginal: hours?.original ?? null,
-    salaryMin: salary?.min ?? null, salaryMax: salary?.max ?? null, salaryPeriod: salary?.period ?? null,
-    salaryBasisHours: salary?.basisHours ?? null, salaryOriginal: salary?.original ?? null, deadline,
-    originalText, rawData, warnings,
+    salaryMin: salary.min, salaryMax: salary.max, salaryPeriod: salary.period,
+    salaryBasisHours: salary.basisHours, salaryOriginal: salary.original, deadline,
+    originalText, rawData, warnings, isStage,
     contentHash: createHash("sha256").update(JSON.stringify(rawData)).digest("hex"),
     canonicalKey: createHash("sha256").update(stable).digest("hex"),
   };

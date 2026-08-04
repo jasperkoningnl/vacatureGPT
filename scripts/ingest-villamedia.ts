@@ -12,7 +12,7 @@ const [run] = await db.insert(sourceRuns).values({ sourceId: source.id }).return
 function vacancyValues(item: VillamediaVacancy) {
   return { canonicalKey: item.canonicalKey, title: item.title, employer: item.employer, location: item.location, hoursMin: item.hoursMin, hoursMax: item.hoursMax,
     hoursOriginal: item.hoursOriginal, salaryMin: item.salaryMin, salaryMax: item.salaryMax, salaryPeriod: item.salaryPeriod, salaryBasisHours: item.salaryBasisHours,
-    salaryOriginal: item.salaryOriginal, deadline: item.deadline, description: item.originalText, originalText: item.originalText, contentHash: item.contentHash, active: true };
+    salaryOriginal: item.salaryOriginal, deadline: item.deadline, description: item.originalText, originalText: item.originalText, contentHash: item.contentHash, active: !item.isStage };
 }
 async function summary(values: { pages: number; discovered: number; parsed: number; added: number; updated: number; unchanged: number; duplicates: number; failed: number; warnings: string[] }) {
   const lines = ["## Villamedia ingestion summary", "", "| Result | Count |", "| --- | ---: |", `| Overview pages fetched | ${values.pages} |`,
