@@ -8,7 +8,7 @@ export type SalaryExtraction = {
   warnings: string[];
 };
 
-const positive = /\b(?:salaris|brutosalaris|brutomaandsalaris|maandsalaris|jaarsalaris|salarisindicatie|salarisschaal|inschaling|ingeschaald|schaal|beloning|loon|uurloon|verdient)\b/i;
+const positive = /\b(?:salaris|brutosalaris|brutomaandsalaris|maandsalaris|jaarsalaris|salarisindicatie|salarisschaal|salarisklasse|inschaling|ingeschaald|schaal|beloning|loon|uurloon|verdient)\b/i;
 const incidental = /\b(?:reiskosten|kilometervergoeding|kilometer|thuiswerkvergoeding|thuiswerkbudget|opleidingsbudget|vergoeding zorgverzekering|bijdrage zorgverzekering|vakantiegeld|vakantietoeslag|eindejaarsuitkering|pensioenbijdrage|onkosten|representatievergoeding|stagevergoeding)\b/i;
 const money = /€\s*((?:\d{1,3}(?:[. ]\d{3})+|\d{4,6}|\d{1,3})(?:,\d{1,2})?)\s*(?:,-)?|((?:\d{1,3}(?:[. ]\d{3})+|\d{4,6}|\d{1,3})(?:,\d{1,2})?)\s*euro\b/gi;
 
@@ -44,7 +44,7 @@ function candidate(original: string): Candidate | null {
   else min = max = values[0];
   let salaryPeriod = period(original);
   const normalMonthly = [min, max].filter((value): value is number => value !== null).every((value) => value >= 1_000 && value <= 20_000);
-  const inferred = !salaryPeriod && normalMonthly && /\b(?:bruto|salaris|schaal|inschaling|ingeschaald)\b/i.test(original);
+  const inferred = !salaryPeriod && normalMonthly && /\b(?:bruto|salaris|salarisklasse|schaal|inschaling|ingeschaald)\b/i.test(original);
   if (inferred) salaryPeriod = "month";
   return { min, max, period: salaryPeriod, basisHours: basisHours(original), original, inferred };
 }
