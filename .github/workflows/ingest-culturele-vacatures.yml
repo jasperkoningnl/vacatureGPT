@@ -1,0 +1,30 @@
+name: Ingest Culturele Vacatures
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingest-culturele-vacatures:
+    name: Ingest Culturele Vacatures
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install pnpm 10.28.1
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.1
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Ingest Culturele Vacatures
+        run: pnpm ingest:culturele

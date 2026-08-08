@@ -42,6 +42,8 @@ describe("shared salary parser", () => {
 
   it("laat numeriek salaris winnen van kwalitatieve tekst", () => expect(extractSalary(["Salaris afhankelijk van ervaring", "Brutomaandsalaris €3.449 - €5.056"])).toMatchObject({ status: "numeric", min: 3449 }));
 
+  it("herkent een salarisklasse als herbruikbare salariscontext", () => expect(extractSalary(["Gehonoreerd binnen salarisklasse F (€ 3.032,79 – € 4.241,24)"])).toMatchObject({ status: "numeric", min: 3033, max: 4241, period: "month" }));
+
   it("detecteert stages op hele woorden en niet op letterreeksen", () => {
     expect(detectStage("Stage: journalistiek", [])).toBe(true);
     expect(detectStage("Creatieve student", ["Je ontvangt een stagevergoeding."])).toBe(true);
