@@ -7,6 +7,7 @@ export type SalaryExtraction = {
   original: string | null;
   warnings: string[];
 };
+import { createIngestionWarning } from "./ingestion-warnings";
 
 const positive = /\b(?:salaris|brutosalaris|brutomaandsalaris|maandsalaris|jaarsalaris|salarisindicatie|salarisschaal|salarisklasse|inschaling|ingeschaald|schaal|beloning|loon|uurloon|verdient)\b/i;
 const incidental = /\b(?:reiskosten|kilometervergoeding|kilometer|thuiswerkvergoeding|thuiswerkbudget|opleidingsbudget|vergoeding zorgverzekering|bijdrage zorgverzekering|vakantiegeld|vakantietoeslag|eindejaarsuitkering|pensioenbijdrage|onkosten|representatievergoeding|stagevergoeding)\b/i;
@@ -67,10 +68,10 @@ export function extractSalary(blocks: string[]): SalaryExtraction {
   const numeric = unique.map(candidate).filter((value): value is Candidate => value !== null);
   if (numeric.length) {
     const incompatible = numeric.some((value, index) => numeric.slice(index + 1).some((other) => !corroborates(value, other)));
-    if (incompatible) return { status: "ambiguous", min: null, max: null, period: null, basisHours: null, original: numeric.map((value) => value.original).join("\n"), warnings: ["Multiple competing employee salary ranges found."] };
+    if (incompatible) return { status: "ambiguous", min: null, max: null, period: null, basisHours: null, original: numeric.map((value) => value.original).join("\n"), warnings: [createIngestionWarning({ severity: "warning", category: "salary", message: "Salaris ambigu — er zijn meerdere verschillende salarisranges gevonden. Er is daarom geen numeriek salaris opgeslagen." })] };
     const best = [...numeric].sort((a, b) => precision(b) - precision(a))[0];
     return { status: "numeric", min: best.min, max: best.max, period: best.period, basisHours: best.basisHours, original: best.original,
-      warnings: best.inferred ? ["Salary period inferred as month from Dutch salary-scale context."] : [] };
+      warnings: best.inferred ? [createIngestionWarning({ severity: "info", category: "salary", message: "Salarisperiode afgeleid — de vacature noemt een salarisrange in een salarisschaal zonder expliciet ‘per maand’; deze is als maandsalaris geïnterpreteerd." })] : [] };
   }
   const qualitative = unique.filter((block) => positive.test(block) && !incidental.test(block) && amounts(block).length === 0);
   if (qualitative.length) return { status: "qualitative", min: null, max: null, period: null, basisHours: null, original: qualitative.join("\n"), warnings: [] };

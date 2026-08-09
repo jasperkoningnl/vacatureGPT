@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
 import { extractSalary } from "./shared/salary-parser";
+import { createIngestionWarning } from "./shared/ingestion-warnings";
 
 export const CULTURELE_BASE_URL = "https://www.culturele-vacatures.nl";
 export const CULTURELE_OVERVIEW_URL = `${CULTURELE_BASE_URL}/vacatures-zoeken/`;
@@ -91,7 +92,7 @@ export function parseCultureleDetail(html: string, overview: CultureleOverviewVa
   const postId = $("article[id^='post-']").first().attr("id")?.match(/^post-(\d+)$/)?.[1];
   const sourceUrl = detailUrl(canonical ?? "", overview.sourceUrl) ?? overview.sourceUrl;
   const title = heading.title || overview.title; const employer = heading.employer || overview.employer;
-  const warnings = [...salary.warnings]; if (!postId) warnings.push("WordPress post-ID ontbreekt; canonical URL wordt als extern ID gebruikt.");
+  const warnings = [...salary.warnings]; if (!postId) warnings.push(createIngestionWarning({ severity: "info", category: "identity", message: "WordPress post-ID ontbreekt — de canonical URL is veilig als identifier gebruikt." }));
   const stable = `${title.toLowerCase()}|${employer.toLowerCase()}|${(overview.location ?? "").toLowerCase()}`;
   const rawData = { overview, canonical: sourceUrl, extracted: { salaryStatus: salary.status, salaryWarnings: salary.warnings }, parserWarnings: warnings };
   return { ...overview, sourceUrl, externalId: postId ?? sourceUrl, title, employer,
@@ -115,7 +116,7 @@ export async function fetchCulturele(fetcher: typeof fetch = fetch) {
     try { const response = await fetcher(entry.sourceUrl, { headers: { "user-agent": "VacatureGPT/1.0 personal vacancy search" } });
       if (!response.ok) throw new Error(`HTTP ${response.status}`); const parsed = parseCultureleDetail(await response.text(), entry);
       if (!parsed.originalText || !parsed.title || !parsed.employer) throw new Error("geen bruikbare vacaturetekst, titel of werkgever"); results.push(parsed);
-    } catch (error) { warnings.push(`${entry.sourceUrl}: ${error instanceof Error ? error.message : "parseerfout"}`); }
+    } catch (error) { warnings.push(createIngestionWarning({ severity: "warning", category: "fetch", url: entry.sourceUrl, message: `Vacature kon niet worden gelezen — ${error instanceof Error ? error.message : "onbekende parseerfout"}. Deze vacature is deze run overgeslagen.` })); }
   }
   return { ...discovery, results, failedCount: discovery.entries.length - results.length, warnings };
 }

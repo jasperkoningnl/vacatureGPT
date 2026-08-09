@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { RSS_URL, fetchOneWorldUrls, matchRepairOccurrence, parseDetail, parseHours, parseRss, parseSalary, qualityWarnings, repairFailureReason } from "./oneworld-parser";
+import { parseIngestionWarning } from "./shared/ingestion-warnings";
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 
@@ -90,7 +91,7 @@ describe("OneWorld parser", () => {
     const result = await fetchOneWorldUrls([goodUrl, badUrl], fetcher);
     expect(result.results).toHaveLength(1);
     expect(result).toMatchObject({ requestedCount: 2, failedCount: 1 });
-    expect(result.warnings).toContain(`${badUrl}: HTTP 404`);
+    expect(result.warnings.map(parseIngestionWarning)).toContainEqual(expect.objectContaining({ severity: "warning", category: "fetch", url: badUrl, message: expect.stringContaining("HTTP 404") }));
     expect(repairFailureReason(result.requestedCount, result.results.length, result.failedCount, result.warnings)).toBeNull();
   });
 

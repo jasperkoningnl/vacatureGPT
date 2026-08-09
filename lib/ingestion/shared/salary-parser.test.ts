@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { detectStage, extractSalary } from "./salary-parser";
+import { parseIngestionWarning } from "./ingestion-warnings";
 
 const numeric = (text: string) => extractSalary([text]);
 
@@ -43,6 +44,11 @@ describe("shared salary parser", () => {
   it("laat numeriek salaris winnen van kwalitatieve tekst", () => expect(extractSalary(["Salaris afhankelijk van ervaring", "Brutomaandsalaris €3.449 - €5.056"])).toMatchObject({ status: "numeric", min: 3449 }));
 
   it("herkent een salarisklasse als herbruikbare salariscontext", () => expect(extractSalary(["Gehonoreerd binnen salarisklasse F (€ 3.032,79 – € 4.241,24)"])).toMatchObject({ status: "numeric", min: 3033, max: 4241, period: "month" }));
+
+  it("classificeert afleiding als info en concurrerende bereiken als waarschuwing", () => {
+    expect(parseIngestionWarning(numeric("Salarisklasse F €3.000 - €4.000").warnings[0]).severity).toBe("info");
+    expect(parseIngestionWarning(extractSalary(["Salaris €3.000 - €4.000 per maand", "Salaris €5.000 - €6.000 per maand"]).warnings[0]).severity).toBe("warning");
+  });
 
   it("detecteert stages op hele woorden en niet op letterreeksen", () => {
     expect(detectStage("Stage: journalistiek", [])).toBe(true);

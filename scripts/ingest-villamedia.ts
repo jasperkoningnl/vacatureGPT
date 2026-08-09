@@ -3,6 +3,7 @@ import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
 import { batchFailureReason, fetchVillamedia, type VillamediaVacancy, VILLAMEDIA_BASE_URL } from "../lib/ingestion/villamedia-parser";
+import { createIngestionWarning, parseIngestionWarning, runStatusForWarnings, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
 
 const db = getDb();
 const [source] = await db.insert(sources).values({ slug: "villamedia", name: "Villamedia", baseUrl: VILLAMEDIA_BASE_URL, enabled: true })
@@ -18,7 +19,7 @@ async function summary(values: { pages: number; discovered: number; parsed: numb
   const lines = ["## Villamedia ingestion summary", "", "| Result | Count |", "| --- | ---: |", `| Overview pages fetched | ${values.pages} |`,
     `| Unique vacancy URLs discovered | ${values.discovered} |`, `| Parsed | ${values.parsed} |`, `| Added | ${values.added} |`, `| Updated | ${values.updated} |`,
     `| Unchanged | ${values.unchanged} |`, `| Duplicates prevented | ${values.duplicates} |`, `| Failed | ${values.failed} |`, `| Warnings | ${values.warnings.length} |`, "",
-    values.warnings.length ? `### Warnings\n${values.warnings.map((warning) => `- ${warning}`).join("\n")}` : "No warnings.", ""];
+    warningsMarkdown(values.warnings), ""];
   console.log(`Villamedia summary: pages=${values.pages}, discovered=${values.discovered}, parsed=${values.parsed}, added=${values.added}, updated=${values.updated}, unchanged=${values.unchanged}, duplicates=${values.duplicates}, failed=${values.failed}, warnings=${values.warnings.length}`);
   values.warnings.forEach((warning) => console.warn(`Villamedia warning: ${warning}`));
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"), "utf8");
@@ -27,10 +28,10 @@ async function summary(values: { pages: number; discovered: number; parsed: numb
 let fetched: Awaited<ReturnType<typeof fetchVillamedia>> | undefined;
 try {
   fetched = await fetchVillamedia();
-  const warnings = [...fetched.warnings, ...fetched.results.flatMap((item) => item.warnings.map((warning) => `${item.sourceUrl}: ${warning}`))];
+  const warnings = [...fetched.warnings, ...fetched.results.flatMap((item) => item.warnings.map((warning) => createIngestionWarning({ ...parseIngestionWarning(warning), url: item.sourceUrl })))];
   const failure = batchFailureReason(fetched.entries.length, fetched.results, fetched.failedCount);
   if (failure) {
-    warnings.push(failure);
+    warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `${failure} Er zijn geen vacatures bijgewerkt.` }));
     await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: fetched.results.length, warnings, error: `${failure} Geen vacaturewrites uitgevoerd.` }).where(eq(sourceRuns.id, run.id));
     await summary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added: 0, updated: 0, unchanged: 0, duplicates: 0, failed: fetched.failedCount, warnings });
     throw new Error("Villamedia-ingestie afgebroken vóór vacaturewrites.");
@@ -53,7 +54,7 @@ try {
     else await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
       .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
   }
-  await db.update(sourceRuns).set({ status: warnings.length ? "warning" : "success", finishedAt: new Date(), resultCount: fetched.results.length, newCount: added, changedCount: updated, warnings }).where(eq(sourceRuns.id, run.id));
+  await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: fetched.results.length, newCount: added, changedCount: updated, warnings }).where(eq(sourceRuns.id, run.id));
   await summary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added, updated, unchanged, duplicates, failed: fetched.failedCount, warnings });
 } catch (error) {
   await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), error: error instanceof Error ? error.message : "Onbekende fout" }).where(eq(sourceRuns.id, run.id));

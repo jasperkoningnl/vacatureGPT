@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
 import { detectStage, extractSalary } from "./shared/salary-parser";
+import { createIngestionWarning } from "./shared/ingestion-warnings";
 
 export const VILLAMEDIA_BASE_URL = "https://www.villamedia.nl";
 export const VILLAMEDIA_OVERVIEW_URL = `${VILLAMEDIA_BASE_URL}/vacatures`;
@@ -121,9 +122,9 @@ export function parseVillamediaDetail(html: string, overview: OverviewVacancy): 
   const salary = extractSalary(evidenceBlocks);
   const isStage = detectStage(title, evidenceBlocks);
   const warnings: string[] = [];
-  if (!title) warnings.push("Titel ontbreekt.");
-  if (!employer) warnings.push("Werkgever ontbreekt.");
-  if (!(overview.externalId || identifier)) warnings.push("Extern ID ontbreekt.");
+  if (!title) warnings.push(createIngestionWarning({ severity: "warning", category: "data-quality", message: "Titel ontbreekt — deze vacature kan niet volledig worden verwerkt." }));
+  if (!employer) warnings.push(createIngestionWarning({ severity: "warning", category: "data-quality", message: "Werkgever ontbreekt — deze vacature kan niet volledig worden verwerkt." }));
+  if (!(overview.externalId || identifier)) warnings.push(createIngestionWarning({ severity: "warning", category: "identity", message: "Externe identifier ontbreekt — identificatie van deze vacature is onzeker." }));
   warnings.push(...salary.warnings);
   const rawData = { job, overview, extracted: { hoursOriginal: hours?.original ?? null, salaryOriginal: salary.original, salaryStatus: salary.status, salaryWarnings: salary.warnings, isStage }, parserWarnings: warnings };
   const stable = `${title.toLowerCase()}|${employer.toLowerCase()}|${(location ?? "").toLowerCase()}`;
@@ -157,7 +158,7 @@ export async function fetchVillamedia(fetcher: typeof fetch = fetch) {
       const parsed = parseVillamediaDetail(await response.text(), entry);
       if (!parsed.originalText || !parsed.title) throw new Error("geen bruikbare vacaturetekst of titel");
       results.push(parsed);
-    } catch (error) { warnings.push(`${entry.sourceUrl}: ${error instanceof Error ? error.message : "parseerfout"}`); }
+    } catch (error) { warnings.push(createIngestionWarning({ severity: "warning", category: "fetch", url: entry.sourceUrl, message: `Vacature kon niet worden gelezen — ${error instanceof Error ? error.message : "onbekende parseerfout"}. Deze vacature is deze run overgeslagen.` })); }
   }
   return { ...discovery, results, failedCount: discovery.entries.length - results.length, warnings };
 }

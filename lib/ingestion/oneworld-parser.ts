@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
+import { createIngestionWarning, parseIngestionWarning } from "./shared/ingestion-warnings";
 
 export const RSS_URL = "https://www.oneworld.nl/wpjobboard/xml/rss/?category=7&type=3&meta%5Bworkload%5D=32-36";
 export const UNKNOWN_EMPLOYER = "Onbekende werkgever";
@@ -174,19 +175,19 @@ export function parseDetail(html: string, sourceUrl: string): NormalizedVacancy 
 }
 
 export function qualityWarnings(results: NormalizedVacancy[]) {
-  if (!results.length) return ["OneWorld leverde onverwacht nul resultaten."];
-  const warnings = results.flatMap((result) => result.warnings.map((warning) => `${result.sourceUrl}: ${warning}`));
+  if (!results.length) return [createIngestionWarning({ severity: "critical", category: "batch", message: "Broncontrole mislukt — OneWorld leverde onverwacht nul vacatures. Er zijn geen vacatures bijgewerkt." })];
+  const warnings = results.flatMap((result) => result.warnings.map((warning) => createIngestionWarning({ ...parseIngestionWarning(warning), url: result.sourceUrl })));
   const unknownEmployers = results.filter((result) => result.employer === UNKNOWN_EMPLOYER).length;
   const unknownHours = results.filter((result) => result.hoursMin === null).length;
-  if (unknownEmployers / results.length > 0.2) warnings.push(`Kwaliteitswaarschuwing: ${unknownEmployers}/${results.length} vacatures hebben een onbekende werkgever (>20%).`);
-  if (unknownHours / results.length > 0.5) warnings.push(`Kwaliteitswaarschuwing: ${unknownHours}/${results.length} vacatures hebben onbekende uren (>50%).`);
+  if (unknownEmployers / results.length > 0.2) warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `Broncontrole mislukt — ${unknownEmployers} van ${results.length} vacatures hebben een onbekende werkgever (meer dan 20%).` }));
+  if (unknownHours / results.length > 0.5) warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `Broncontrole mislukt — ${unknownHours} van ${results.length} vacatures hebben onbekende uren (meer dan 50%).` }));
   return warnings;
 }
 
 /** Warnings that make a production repair unsafe to apply. Hour-range conflicts are
  * retained for auditability, but do not reject a record because labelled hours win. */
 export function isCriticalQualityWarning(warning: string) {
-  return /Kwaliteitswaarschuwing|onverwacht nul resultaten|geen bruikbare metadata|gecodeerde HTML-entiteit/i.test(warning);
+  return parseIngestionWarning(warning).severity === "critical" || /Kwaliteitswaarschuwing|onverwacht nul resultaten|geen bruikbare metadata|gecodeerde HTML-entiteit/i.test(warning);
 }
 
 const ONE_WORLD_USER_AGENT = "VacatureGPT/1.0 personal vacancy search";
@@ -205,7 +206,7 @@ export async function fetchOneWorldUrls(urls: string[], fetcher: typeof fetch = 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       results.push(parseDetail(await response.text(), url));
     } catch (error) {
-      fetchWarnings.push(`${url}: ${error instanceof Error ? error.message : "parseerfout"}`);
+      fetchWarnings.push(createIngestionWarning({ severity: "warning", category: "fetch", url, message: `Vacature kon niet worden gelezen — ${error instanceof Error ? error.message : "onbekende parseerfout"}. Deze vacature is deze run overgeslagen.` }));
     }
   }
   return {

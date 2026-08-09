@@ -3,6 +3,7 @@ import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sourceRuns, sources, vacancies, vacancyOccurrences } from "../lib/db/schema";
 import { batchFailureReason, CULTURELE_BASE_URL, fetchCulturele, mergeReliable, type CultureleVacancy } from "../lib/ingestion/culturele-vacatures-parser";
+import { createIngestionWarning, parseIngestionWarning, runStatusForWarnings, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
 
 const db = getDb();
 const [source] = await db.insert(sources).values({ slug: "culturele-vacatures", name: "Culturele Vacatures", baseUrl: CULTURELE_BASE_URL, enabled: true })
@@ -20,7 +21,7 @@ async function writeSummary(counts: { pages: number; discovered: number; parsed:
   const rows = [["Overview pages fetched", counts.pages], ["Paid vacancies discovered", counts.discovered], ["Parsed", counts.parsed], ["Added", counts.added],
     ["Updated", counts.updated], ["Unchanged", counts.unchanged], ["Deduplicated", counts.deduplicated], ["Failed", counts.failed], ["Warnings", counts.warnings.length]] as const;
   const text = ["## Culturele Vacatures ingestion summary", "", "| Result | Count |", "| --- | ---: |", ...rows.map(([label, count]) => `| ${label} | ${count} |`), "",
-    counts.warnings.length ? `### Warnings\n${counts.warnings.map((warning) => `- ${warning}`).join("\n")}` : "No warnings.", ""].join("\n");
+    warningsMarkdown(counts.warnings), ""].join("\n");
   console.log(`Culturele Vacatures summary: ${rows.map(([label, count]) => `${label}=${count}`).join(", ")}`);
   counts.warnings.forEach((warning) => console.warn(`Culturele Vacatures warning: ${warning}`));
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, text, "utf8");
@@ -28,10 +29,10 @@ async function writeSummary(counts: { pages: number; discovered: number; parsed:
 
 try {
   const fetched = await fetchCulturele();
-  const warnings = [...fetched.warnings, ...fetched.results.flatMap((item) => item.warnings.map((warning) => `${item.sourceUrl}: ${warning}`))];
+  const warnings = [...fetched.warnings, ...fetched.results.flatMap((item) => item.warnings.map((warning) => createIngestionWarning({ ...parseIngestionWarning(warning), url: item.sourceUrl })))];
   const failure = batchFailureReason(fetched.entries.length, fetched.results, fetched.failedCount);
   if (failure) {
-    warnings.push(failure);
+    warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `${failure} Er zijn geen vacatures bijgewerkt.` }));
     await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: fetched.results.length, warnings, error: `${failure} Geen vacaturewrites uitgevoerd.` }).where(eq(sourceRuns.id, run.id));
     await writeSummary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added: 0, updated: 0, unchanged: 0, deduplicated: 0, failed: fetched.failedCount, warnings });
     throw new Error("Culturele Vacatures-ingestie afgebroken vóór vacaturewrites.");
@@ -60,7 +61,7 @@ try {
     else await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
       .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
   }
-  await db.update(sourceRuns).set({ status: warnings.length ? "warning" : "success", finishedAt: new Date(), resultCount: fetched.results.length, newCount: added, changedCount: updated, warnings }).where(eq(sourceRuns.id, run.id));
+  await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: fetched.results.length, newCount: added, changedCount: updated, warnings }).where(eq(sourceRuns.id, run.id));
   await writeSummary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added, updated, unchanged, deduplicated, failed: fetched.failedCount, warnings });
 } catch (error) {
   await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), error: error instanceof Error ? error.message : "Onbekende fout" }).where(eq(sourceRuns.id, run.id)); throw error;
