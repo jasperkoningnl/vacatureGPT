@@ -28,7 +28,8 @@ function period(text: string): SalaryExtraction["period"] {
 }
 
 function basisHours(text: string) {
-  const match = text.match(/\b(?:op basis van|bij|voor)\s+(?:een\s+)?(\d{1,2})(?:[- ]?urige|\s*uur)(?:\s+(?:per week|werkweek))?/i);
+  const match = text.match(/\b(?:op basis van|bij|voor)\s+(?:een\s+)?(\d{1,2})(?:[- ]?urige|\s*uur)(?:\s+(?:per week|werkweek))?/i)
+    ?? text.match(/\bwerkweek\s+van\s+(\d{1,2})\s*uur\b/i);
   return match ? Number(match[1]) : null;
 }
 
