@@ -3,6 +3,7 @@ import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
 import { fetchOneWorld, fetchOneWorldUrls, matchRepairOccurrence, repairFailureReason, type NormalizedVacancy } from "../lib/ingestion/oneworld-parser";
+import { createIngestionWarning, runStatusForWarnings, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
 
 const db = getDb();
 const [source] = await db.select().from(sources).where(eq(sources.slug, "oneworld"));
@@ -24,7 +25,7 @@ async function writeSummary(values: { requested: number; parsed: number; updated
     `| Duplicates prevented | ${values.duplicates} |`,
     `| Newly imported | ${values.added} |`,
     "",
-    values.warnings.length ? `### Warnings\n${values.warnings.map((warning) => `- ${warning}`).join("\n")}` : "No warnings.",
+    warningsMarkdown(values.warnings),
     "",
   ];
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"), "utf8");
@@ -65,7 +66,7 @@ try {
   const repairFailure = isRepair ? repairFailureReason(requestedCount, results.length, failedCount, warnings) : null;
   // Validate the complete batch before changing any vacancy or occurrence.
   if (repairFailure) {
-    warnings.push(repairFailure);
+    warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `${repairFailure} Er zijn geen vacatures gewijzigd.` }));
     await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: results.length, warnings, error: `${repairFailure} Er zijn geen vacatures gewijzigd.` }).where(eq(sourceRuns.id, run.id));
     await writeSummary({ requested: requestedCount, parsed: results.length, updated: 0, unchanged: 0, failed: failedCount, duplicates: repairUrls.length - requestedCount, added: 0, warnings });
     throw new Error("OneWorld-reparatie afgebroken vóór databasewijzigingen. Bekijk het workflowoverzicht.");
@@ -78,7 +79,7 @@ try {
     if (isRepair) {
       const matched = matchRepairOccurrence(item, repairOccurrences.map(({ occurrence }) => occurrence));
       if (!matched) {
-        warnings.push(`${item.sourceUrl}: geen bestaande OneWorld-occurrence gevonden; overgeslagen zonder nieuwe vacature.`);
+        warnings.push(createIngestionWarning({ severity: "warning", category: "identity", url: item.sourceUrl, message: "Bestaande vacature niet veilig teruggevonden — deze occurrence is overgeslagen en er is geen nieuwe vacature aangemaakt." }));
         continue;
       }
       const existing = repairOccurrences.find(({ occurrence }) => occurrence.id === matched.id)!;
@@ -120,7 +121,7 @@ try {
         .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
     }
   }
-  await db.update(sourceRuns).set({ status: warnings.length ? "warning" : "success", finishedAt: new Date(), resultCount: results.length, newCount: added, changedCount: changed, warnings }).where(eq(sourceRuns.id, run.id));
+  await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: results.length, newCount: added, changedCount: changed, warnings }).where(eq(sourceRuns.id, run.id));
   await writeSummary({ requested: requestedCount, parsed: results.length, updated: changed, unchanged, failed: failedCount, duplicates, added, warnings });
 } catch (error) {
   await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), error: error instanceof Error ? error.message : "Onbekende fout" }).where(eq(sourceRuns.id, run.id));
