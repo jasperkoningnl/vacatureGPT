@@ -15,6 +15,13 @@
       "when": 1785500000000,
       "tag": "0001_oneworld_extraction",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786306937812,
+      "tag": "0002_wide_red_wolf",
+      "breakpoints": true
     }
   ]
 }

@@ -17,7 +17,8 @@
     "repair:oneworld": "tsx scripts/ingest-oneworld.ts --repair",
     "ingest:villamedia": "tsx scripts/ingest-villamedia.ts",
     "ingest:culturele": "tsx scripts/ingest-culturele-vacatures.ts",
-    "ingest:overheid": "tsx scripts/ingest-werken-bij-de-overheid.ts"
+    "ingest:overheid": "tsx scripts/ingest-werken-bij-de-overheid.ts",
+    "ai:assess": "tsx scripts/assess-vacancies.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -25,6 +26,7 @@
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.5",
     "next": "^16.2.12",
+    "openai": "^7.4.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.4.3"
