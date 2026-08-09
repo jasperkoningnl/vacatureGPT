@@ -1,0 +1,30 @@
+name: Assess vacancies with AI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  assess:
+    name: Migrate and assess active vacancies
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install pnpm 10.28.1
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.1
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run database migrations
+        run: pnpm db:migrate
+      - name: Assess vacancies
+        run: pnpm ai:assess
