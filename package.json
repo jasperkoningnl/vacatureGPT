@@ -16,7 +16,8 @@
     "ingest:oneworld": "tsx scripts/ingest-oneworld.ts",
     "repair:oneworld": "tsx scripts/ingest-oneworld.ts --repair",
     "ingest:villamedia": "tsx scripts/ingest-villamedia.ts",
-    "ingest:culturele": "tsx scripts/ingest-culturele-vacatures.ts"
+    "ingest:culturele": "tsx scripts/ingest-culturele-vacatures.ts",
+    "ingest:overheid": "tsx scripts/ingest-werken-bij-de-overheid.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
