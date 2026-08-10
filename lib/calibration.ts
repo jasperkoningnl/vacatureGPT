@@ -1,0 +1,44 @@
+export const verdictLabels = { interesting: "Interessant", maybe: "Misschien", not_suitable: "Niet passend" } as const;
+export type Verdict = keyof typeof verdictLabels;
+export type ReasonCode = "role" | "seniority" | "location" | "hours" | "salary" | "employer" | "other";
+
+export type CalibrationCandidate = {
+  id: number; title: string; employer: string; location: string | null;
+  hoursMin: number | null; hoursMax: number | null; hoursOriginal: string | null;
+  salaryMin: number | null; salaryMax: number | null; salaryOriginal: string | null;
+  deadline: Date | null; description: string | null; originalText: string; aiVerdict: Verdict;
+};
+export type BlindVacancy = Omit<CalibrationCandidate, "aiVerdict">;
+export function isCalibrationEligible(value: { active: boolean; aiVerdict: Verdict | null; hasFeedback: boolean }) { return value.active && value.aiVerdict !== null && !value.hasFeedback; }
+
+const target: Verdict[] = ["interesting", "interesting", "interesting", "maybe", "not_suitable"];
+const shuffled = <T,>(items: T[], random: () => number) => items.map(value => ({ value, order: random() })).sort((a, b) => a.order - b.order).map(x => x.value);
+
+/** Selects a balanced batch, then fills shortages without duplicates. Employer variety is preferred. */
+export function selectCalibrationBatch(candidates: CalibrationCandidate[], random = Math.random): BlindVacancy[] {
+  const pools = new Map<Verdict, CalibrationCandidate[]>();
+  for (const verdict of Object.keys(verdictLabels) as Verdict[]) pools.set(verdict, shuffled(candidates.filter(x => x.aiVerdict === verdict), random));
+  const selected: CalibrationCandidate[] = [];
+  const used = new Set<number>(); const employers = new Set<string>();
+  const take = (pool: CalibrationCandidate[], preferEmployer = true) => {
+    const index = pool.findIndex(x => !used.has(x.id) && (!preferEmployer || !employers.has(x.employer.toLocaleLowerCase("nl"))));
+    if (index < 0) return false;
+    const [item] = pool.splice(index, 1); selected.push(item); used.add(item.id); employers.add(item.employer.toLocaleLowerCase("nl")); return true;
+  };
+  for (const verdict of target) if (!take(pools.get(verdict)!, true)) take(pools.get(verdict)!, false);
+  const remaining = shuffled(candidates.filter(x => !used.has(x.id)), random);
+  while (selected.length < 5 && (take(remaining, true) || take(remaining, false))) { /* fill */ }
+  return shuffled(selected, random).map((item) => { const { aiVerdict, ...vacancy } = item; void aiVerdict; return vacancy; });
+}
+
+export function calibrationSummary(results: { userVerdict: Verdict; aiVerdict: Verdict }[]) {
+  const agreed = results.filter(x => x.userVerdict === x.aiVerdict).length;
+  const breakdown = { interesting: 0, maybe: 0, not_suitable: 0 };
+  for (const result of results) breakdown[result.userVerdict]++;
+  return { total: results.length, agreed, differed: results.length - agreed, agreementPercentage: results.length ? Math.round(agreed / results.length * 100) : 0, breakdown };
+}
+
+export function compactExcerpt(vacancy: Pick<BlindVacancy, "description" | "originalText">, max = 520) {
+  const text = (vacancy.description || vacancy.originalText).replace(/\s+/g, " ").trim();
+  return text.length <= max ? text : `${text.slice(0, max).replace(/\s+\S*$/, "")}…`;
+}
