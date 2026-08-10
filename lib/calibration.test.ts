@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { calibrationSummary, isCalibrationEligible, selectCalibrationBatch, type CalibrationCandidate } from "./calibration";
+import { calibrationSummary, isCalibrationEligible, orderCalibrationBatch, selectCalibrationBatch, type CalibrationCandidate } from "./calibration";
 
 const candidate = (id: number, aiVerdict: CalibrationCandidate["aiVerdict"], employer = `Werkgever ${id}`): CalibrationCandidate => ({ id, aiVerdict, employer, title: `Vacature ${id}`, location: null, hoursMin: null, hoursMax: null, hoursOriginal: null, salaryMin: null, salaryMax: null, salaryOriginal: null, deadline: null, description: null, originalText: "Tekst" });
 describe("calibration selection", () => {
@@ -17,6 +17,10 @@ describe("calibration selection", () => {
   it("prefers different employers where practical", () => {
     const batch = selectCalibrationBatch([candidate(1,"interesting","A"),candidate(2,"interesting","A"),candidate(3,"interesting","B"),candidate(4,"maybe","C"),candidate(5,"not_suitable","D"),candidate(6,"interesting","E")], () => .5);
     expect(new Set(batch.map(x => x.employer)).size).toBe(5);
+  });
+  it("keeps the same URL-defined batch stable and ordered", () => {
+    const rows = [candidate(3, "maybe"), candidate(1, "interesting"), candidate(2, "not_suitable")];
+    expect(orderCalibrationBatch(rows, [2, 3, 1]).map((row) => row.id)).toEqual([2, 3, 1]);
   });
 });
 describe("batch summary", () => { it("calculates agreement and verdict breakdown", () => {

@@ -22,4 +22,15 @@ describe("structured assessment", () => {
     await expect(assessVacancy({ parse } as never, { title: "Editor", employer: "A", location: null, hoursMin: null, hoursMax: null, salaryMin: null, salaryMax: null, salaryPeriod: null, deadline: null, description: null, originalText: "data" }, profile)).rejects.toThrow("no valid structured assessment");
     expect(parse).toHaveBeenCalledOnce();
   });
+  it("requests concise, concrete Dutch explanations in one call", async () => {
+    const parse = vi.fn().mockResolvedValue({ output_parsed: { score: 75, summary: "Concrete match.", positives: [], concerns: [] }, usage: null });
+    const profile = buildAssessmentProfile({ hoursMin: 32, hoursMax: 36, salaryMin: null, primaryCities: [], secondaryCities: [], travelOrigin: "Amersfoort", maxTravelMinutes: 30, roleFamilies: [], positiveIndicators: [], negativeIndicators: [] }, []);
+    await assessVacancy({ parse } as never, { title: "Editor", employer: "A", location: null, hoursMin: null, hoursMax: null, salaryMin: null, salaryMax: null, salaryPeriod: null, deadline: null, description: "Redigeert artikelen", originalText: "Redigeert artikelen" }, profile);
+    const instructions = parse.mock.calls[0][0].instructions;
+    expect(ASSESSMENT_CONFIG.promptVersion).toBe("vacancy-fit-v2");
+    expect(instructions).toContain("clear Dutch");
+    expect(instructions).toContain("1–2 short sentences");
+    expect(instructions).toContain("concrete");
+    expect(parse).toHaveBeenCalledOnce();
+  });
 });

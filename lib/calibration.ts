@@ -31,6 +31,11 @@ export function selectCalibrationBatch(candidates: CalibrationCandidate[], rando
   return shuffled(selected, random).map((item) => { const { aiVerdict, ...vacancy } = item; void aiVerdict; return vacancy; });
 }
 
+export function orderCalibrationBatch<T extends { id: number }>(rows: T[], ids: number[]): T[] {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids.map((id) => byId.get(id)).filter((row): row is T => Boolean(row));
+}
+
 export function calibrationSummary(results: { userVerdict: Verdict; aiVerdict: Verdict }[]) {
   const agreed = results.filter(x => x.userVerdict === x.aiVerdict).length;
   const breakdown = { interesting: 0, maybe: 0, not_suitable: 0 };
