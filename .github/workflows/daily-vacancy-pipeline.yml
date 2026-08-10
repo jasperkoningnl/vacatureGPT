@@ -1,0 +1,118 @@
+name: Daily vacancy pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub Actions cron schedules use UTC and do not support an IANA timezone.
+    # 05:15 UTC is 06:15 in Amsterdam in winter and 07:15 in summer.
+    - cron: "15 5 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-vacancy-pipeline
+  cancel-in-progress: false
+
+jobs:
+  ingest-and-assess:
+    name: Ingest vacancies and run AI assessment
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm 10.28.1
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.1
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run database migrations
+        run: pnpm db:migrate
+
+      - name: Ingest OneWorld vacancies
+        id: oneworld
+        continue-on-error: true
+        run: pnpm ingest:oneworld
+
+      - name: Ingest Villamedia vacancies
+        id: villamedia
+        continue-on-error: true
+        run: pnpm ingest:villamedia
+
+      - name: Ingest Culturele Vacatures
+        id: culturele
+        continue-on-error: true
+        run: pnpm ingest:culturele
+
+      - name: Ingest Werken bij de Overheid vacancies
+        id: overheid
+        continue-on-error: true
+        run: pnpm ingest:overheid
+
+      - name: Assess vacancies with AI
+        id: ai
+        continue-on-error: true
+        run: pnpm ai:assess
+
+      - name: Write pipeline summary
+        if: ${{ always() }}
+        env:
+          ONEWORLD_STATUS: ${{ steps.oneworld.outcome }}
+          VILLAMEDIA_STATUS: ${{ steps.villamedia.outcome }}
+          CULTURELE_STATUS: ${{ steps.culturele.outcome }}
+          OVERHEID_STATUS: ${{ steps.overheid.outcome }}
+          AI_STATUS: ${{ steps.ai.outcome }}
+        run: |
+          status_label() {
+            if [ "$1" = "success" ]; then
+              printf 'success'
+            else
+              printf 'failure'
+            fi
+          }
+
+          {
+            echo "## Daily vacancy pipeline"
+            echo
+            echo "| Step | Status |"
+            echo "| --- | --- |"
+            echo "| OneWorld | $(status_label "$ONEWORLD_STATUS") |"
+            echo "| Villamedia | $(status_label "$VILLAMEDIA_STATUS") |"
+            echo "| Culturele Vacatures | $(status_label "$CULTURELE_STATUS") |"
+            echo "| Werken bij de Overheid | $(status_label "$OVERHEID_STATUS") |"
+            echo "| AI assessment | $(status_label "$AI_STATUS") |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail when an ingestion or assessment failed
+        if: ${{ always() }}
+        env:
+          ONEWORLD_STATUS: ${{ steps.oneworld.outcome }}
+          VILLAMEDIA_STATUS: ${{ steps.villamedia.outcome }}
+          CULTURELE_STATUS: ${{ steps.culturele.outcome }}
+          OVERHEID_STATUS: ${{ steps.overheid.outcome }}
+          AI_STATUS: ${{ steps.ai.outcome }}
+        run: |
+          for status in \
+            "$ONEWORLD_STATUS" \
+            "$VILLAMEDIA_STATUS" \
+            "$CULTURELE_STATUS" \
+            "$OVERHEID_STATUS" \
+            "$AI_STATUS"; do
+            if [ "$status" != "success" ]; then
+              echo "One or more ingestion or AI assessment steps failed or were skipped."
+              exit 1
+            fi
+          done
