@@ -3,7 +3,7 @@ import { buildWeeklyDigest, deliveryAction, digestBoundary, selectWeeklyVacancie
 
 const now = new Date("2026-08-11T07:00:00Z");
 function vacancy(overrides: Partial<DigestVacancy> = {}): DigestVacancy {
-  return { id: 1, title: "Redacteur", employer: "Omroep", location: "Hilversum", active: true, hoursMin: 32, hoursMax: 36, hoursOriginal: null, salaryMin: 3500, salaryMax: 4500, salaryPeriod: "per maand", salaryOriginal: null, firstSeenAt: new Date("2026-08-10T10:00:00Z"), score: 80, verdict: "interesting", reviewed: false, ...overrides };
+  return { id: 1, title: "Redacteur", employer: "Omroep", location: "Hilversum", active: true, hoursMin: 32, hoursMax: 36, hoursOriginal: null, salaryMin: 3500, salaryMax: 4500, salaryPeriod: "per maand", salaryOriginal: null, firstSeenAt: new Date("2026-08-10T10:00:00Z"), score: 80, verdict: "interesting", feedbackValue: null, ...overrides };
 }
 
 describe("weekly candidate selection", () => {
@@ -12,9 +12,10 @@ describe("weekly candidate selection", () => {
     expect(selectWeeklyVacancies([vacancy(), vacancy({ id: 2, firstSeenAt: new Date("2026-08-04T06:59:59Z") })], boundary, new Set()).map((item) => item.id)).toEqual([1]);
   });
 
-  it("uses the last successful digest boundary for later digests", () => {
+  it("uses durable sent history rather than a timestamp boundary after the first digest", () => {
     const boundary = digestBoundary(now, new Date("2026-08-09T12:00:00Z"));
-    expect(selectWeeklyVacancies([vacancy(), vacancy({ id: 2, firstSeenAt: new Date("2026-08-09T11:00:00Z") })], boundary, new Set()).map((item) => item.id)).toEqual([1]);
+    expect(boundary).toBeNull();
+    expect(selectWeeklyVacancies([vacancy(), vacancy({ id: 2, firstSeenAt: new Date("2026-08-01T11:00:00Z") })], boundary, new Set([1])).map((item) => item.id)).toEqual([2]);
   });
 
   it("excludes inactive, unsuitable, and successfully emailed vacancies", () => {
@@ -23,11 +24,23 @@ describe("weekly candidate selection", () => {
   });
 
   it("prefers unreviewed vacancies and respects the maximum size while ranking internally", () => {
-    const rows = Array.from({ length: 18 }, (_, index) => vacancy({ id: index + 1, score: 50 + index, reviewed: index === 17 }));
+    const rows = Array.from({ length: 18 }, (_, index) => vacancy({ id: index + 1, score: 50 + index, feedbackValue: index === 17 ? "interesting" : null }));
     const selected = selectWeeklyVacancies(rows, new Date(0), new Set(), 15);
     expect(selected).toHaveLength(15);
     expect(selected.map((item) => item.id)).not.toContain(18);
     expect(selected[0].score).toBe(66);
+  });
+
+  it("keeps overflow eligible for the next successful digest", () => {
+    const rows = Array.from({ length: 17 }, (_, index) => vacancy({ id: index + 1, score: 100 - index }));
+    const first = selectWeeklyVacancies(rows, new Date(0), new Set(), 15);
+    const next = selectWeeklyVacancies(rows, null, new Set(first.map(({ id }) => id)), 15);
+    expect(next.map(({ id }) => id)).toEqual([16, 17]);
+  });
+
+  it("excludes Jasper's not-suitable feedback while allowing other reviewed values later in ranking", () => {
+    const rows = [vacancy({ id: 1, feedbackValue: "not_suitable" }), vacancy({ id: 2, feedbackValue: "maybe" }), vacancy({ id: 3 })];
+    expect(selectWeeklyVacancies(rows, null, new Set()).map(({ id }) => id)).toEqual([3, 2]);
   });
 });
 

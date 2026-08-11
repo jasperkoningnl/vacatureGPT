@@ -11,6 +11,10 @@ export function deriveVacancyActive(occurrences: Array<{ active: boolean }>) {
   return occurrences.some((occurrence) => occurrence.active);
 }
 
+export function activeForDiscoveredOccurrence(item: { isStage?: boolean }) {
+  return item.isStage !== true;
+}
+
 export type ReconciledOccurrence = { id: number; sourceId: number; sourceRunId: number | null; active: boolean; lastSeenAt: Date };
 /** Pure lifecycle model used to document and test the safety boundary around reconciliation. */
 export function reconcileOccurrenceStates(rows: ReconciledOccurrence[], sourceId: number, runId: number, trustworthy: boolean, now = new Date()) {
@@ -20,7 +24,7 @@ export function reconcileOccurrenceStates(rows: ReconciledOccurrence[], sourceId
   });
 }
 
-async function recomputeVacancies(vacancyIds: number[]) {
+export async function recomputeVacancyActivity(vacancyIds: number[]) {
   if (!vacancyIds.length) return 0;
   const db = getDb();
   await db.update(vacancies).set({
@@ -37,7 +41,7 @@ export async function reconcileSuccessfulSourceRun(sourceId: number, sourceRunId
     .where(and(eq(vacancyOccurrences.sourceId, sourceId), eq(vacancyOccurrences.active, true), or(isNull(vacancyOccurrences.sourceRunId), ne(vacancyOccurrences.sourceRunId, sourceRunId))))
     .returning({ vacancyId: vacancyOccurrences.vacancyId });
   const affected = [...new Set(missing.map((row) => row.vacancyId))];
-  await recomputeVacancies(affected);
+  await recomputeVacancyActivity(affected);
   return { expiredOccurrences: missing.length, affectedVacancies: affected.length };
 }
 
@@ -47,7 +51,7 @@ export async function expireKnownGoneUrls(sourceId: number, urls: string[]) {
     .where(and(eq(vacancyOccurrences.sourceId, sourceId), eq(vacancyOccurrences.active, true), inArray(vacancyOccurrences.sourceUrl, urls)))
     .returning({ vacancyId: vacancyOccurrences.vacancyId });
   const affected = [...new Set(gone.map((row) => row.vacancyId))];
-  await recomputeVacancies(affected);
+  await recomputeVacancyActivity(affected);
   return { expiredOccurrences: gone.length, affectedVacancies: affected.length };
 }
 
@@ -58,6 +62,6 @@ export async function cleanupStaleOccurrences(now = new Date()) {
     .where(and(eq(vacancyOccurrences.active, true), lt(vacancyOccurrences.lastSeenAt, cutoff)))
     .returning({ vacancyId: vacancyOccurrences.vacancyId });
   const affected = [...new Set(stale.map((row) => row.vacancyId))];
-  await recomputeVacancies(affected);
+  await recomputeVacancyActivity(affected);
   return { expiredOccurrences: stale.length, affectedVacancies: affected.length, cutoff };
 }

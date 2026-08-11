@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
-import { expireKnownGoneUrls, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
+import { expireKnownGoneUrls, recomputeVacancyActivity, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
 import { fetchOneWorld, fetchOneWorldUrls, matchRepairOccurrence, repairFailureReason, type NormalizedVacancy } from "../lib/ingestion/oneworld-parser";
 import { createIngestionWarning, runStatusForWarnings, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
 
@@ -89,6 +89,7 @@ try {
       else unchanged++;
       await db.update(vacancies).set({ ...vacancyValues(item), lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(vacancies.id, existing.vacancy.id));
       await db.update(vacancyOccurrences).set({ active: true, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, matched.id));
+      await recomputeVacancyActivity([existing.vacancy.id]);
       continue;
     }
     // Identity is deliberately resolved before canonical data: corrected employer/title must
@@ -122,8 +123,9 @@ try {
       await db.insert(vacancyOccurrences).values({ active: true, vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
         .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active: true, vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
     }
+    await recomputeVacancyActivity([vacancyId]);
   }
-  if (!isRepair) await reconcileSuccessfulSourceRun(source.id, run.id);
+  if (!isRepair && fetched.failedCount === 0) await reconcileSuccessfulSourceRun(source.id, run.id);
   await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: results.length, newCount: added, changedCount: changed, warnings }).where(eq(sourceRuns.id, run.id));
   await writeSummary({ requested: requestedCount, parsed: results.length, updated: changed, unchanged, failed: failedCount, duplicates, added, warnings });
 } catch (error) {

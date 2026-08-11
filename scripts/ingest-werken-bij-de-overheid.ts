@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sourceRuns, sources, vacancies, vacancyOccurrences } from "../lib/db/schema";
-import { expireKnownGoneUrls, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
+import { expireKnownGoneUrls, recomputeVacancyActivity, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
 import { batchFailureReason, OVERHEID_BASE_URL, fetchOverheid, mergeReliable, type OverheidVacancy } from "../lib/ingestion/werken-bij-de-overheid-parser";
 import { createIngestionWarning, parseIngestionWarning, runStatusForWarnings, warningCounts, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
 
@@ -64,8 +64,10 @@ try {
     if (occurrence) await db.update(vacancyOccurrences).set({ active: true, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
     else await db.insert(vacancyOccurrences).values({ active: true, vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
       .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active: true, vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
+
+    await recomputeVacancyActivity([vacancyId]);
   }
-  await reconcileSuccessfulSourceRun(source.id, run.id);
+  if (fetched.failedCount === 0) await reconcileSuccessfulSourceRun(source.id, run.id);
   await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: fetched.results.length, newCount: added, changedCount: updated, warnings }).where(eq(sourceRuns.id, run.id));
   await writeSummary({ pages: fetched.pagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added, updated, unchanged, deduplicated, failed: fetched.failedCount, warnings });
 } catch (error) {

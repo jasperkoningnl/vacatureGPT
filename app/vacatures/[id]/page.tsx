@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { aiAssessments, feedback, sources, vacancies, vacancyOccurrences } from "@/lib/db/schema";
 import { saveFeedback } from "@/app/actions";
@@ -14,7 +14,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const [v] = await getDb().select({ vacancy: vacancies, sourceUrl: vacancyOccurrences.sourceUrl, source: sources.name, feedback, assessment: aiAssessments })
     .from(vacancies).innerJoin(vacancyOccurrences, eq(vacancies.id, vacancyOccurrences.vacancyId))
     .innerJoin(sources, eq(sources.id, vacancyOccurrences.sourceId)).leftJoin(feedback, eq(feedback.vacancyId, vacancies.id))
-    .leftJoin(aiAssessments, eq(aiAssessments.vacancyId, vacancies.id)).where(eq(vacancies.id, Number(id))).limit(1);
+    .leftJoin(aiAssessments, eq(aiAssessments.vacancyId, vacancies.id)).where(eq(vacancies.id, Number(id)))
+    .orderBy(desc(vacancyOccurrences.active), desc(vacancyOccurrences.lastSeenAt), asc(vacancyOccurrences.id)).limit(1);
   if (!v) notFound();
   const x = v.vacancy;
   return <><p><Link href="/vacatures">← Vacatures</Link></p><h1>{x.title}</h1>{!x.active && <p className="muted">Deze vacature is niet meer actief.</p>}<div className="split">

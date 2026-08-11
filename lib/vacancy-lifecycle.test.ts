@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveVacancyActive, isStaleOccurrence, reconcileOccurrenceStates, type ReconciledOccurrence } from "./vacancy-lifecycle";
+import { activeForDiscoveredOccurrence, deriveVacancyActive, isStaleOccurrence, reconcileOccurrenceStates, type ReconciledOccurrence } from "./vacancy-lifecycle";
 
 describe("vacancy occurrence lifecycle", () => {
   const old = new Date("2026-07-01T00:00:00Z");
@@ -17,6 +17,10 @@ describe("vacancy occurrence lifecycle", () => {
   it("does not deactivate or otherwise mutate rows after an unsafe run", () => expect(reconcileOccurrenceStates(rows, 10, 22, false, now)).toEqual(rows));
   it("keeps a parent active while any source occurrence is active", () => expect(deriveVacancyActive([{ active: false }, { active: true }])).toBe(true));
   it("makes a parent inactive when all occurrences are inactive", () => expect(deriveVacancyActive([{ active: false }, { active: false }])).toBe(false));
+  it("never reactivates an occurrence identified as a Villamedia stage", () => {
+    expect(activeForDiscoveredOccurrence({ isStage: true })).toBe(false);
+    expect(deriveVacancyActive([{ active: activeForDiscoveredOccurrence({ isStage: true }) }])).toBe(false);
+  });
   it("uses lastSeenAt with a strict 14-day cutoff", () => {
     expect(isStaleOccurrence(new Date("2026-07-28T11:59:59Z"), now)).toBe(true);
     expect(isStaleOccurrence(new Date("2026-07-28T12:00:00Z"), now)).toBe(false);

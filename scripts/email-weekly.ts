@@ -31,11 +31,14 @@ try {
       id: vacancies.id, title: vacancies.title, employer: vacancies.employer, location: vacancies.location, active: vacancies.active,
       hoursMin: vacancies.hoursMin, hoursMax: vacancies.hoursMax, hoursOriginal: vacancies.hoursOriginal,
       salaryMin: vacancies.salaryMin, salaryMax: vacancies.salaryMax, salaryPeriod: vacancies.salaryPeriod, salaryOriginal: vacancies.salaryOriginal,
-      firstSeenAt: vacancies.firstSeenAt, score: aiAssessments.score, verdict: aiAssessments.verdict, feedbackId: feedback.id,
+      firstSeenAt: vacancies.firstSeenAt, score: aiAssessments.score, verdict: aiAssessments.verdict, feedbackValue: feedback.value,
     }).from(vacancies).innerJoin(aiAssessments, eq(vacancies.id, aiAssessments.vacancyId)).leftJoin(feedback, eq(vacancies.id, feedback.vacancyId));
-    const candidates: DigestVacancy[] = rows.map(({ feedbackId, ...row }) => ({ ...row, reviewed: feedbackId !== null }));
-    const selected = selectWeeklyVacancies(candidates, digestBoundary(now, lastSuccessful?.sentAt ?? null), new Set(sentRows.map((row) => row.vacancyId)));
-    outcome.eligible = candidates.filter((vacancy) => vacancy.active && vacancy.firstSeenAt > digestBoundary(now, lastSuccessful?.sentAt ?? null) && vacancy.verdict !== "not_suitable" && !sentRows.some((sent) => sent.vacancyId === vacancy.id)).length;
+    const candidates: DigestVacancy[] = rows;
+    const boundary = digestBoundary(now, lastSuccessful?.sentAt ?? null);
+    const sentIds = new Set(sentRows.map((row) => row.vacancyId));
+    const eligible = selectWeeklyVacancies(candidates, boundary, sentIds, Number.MAX_SAFE_INTEGER);
+    const selected = eligible.slice(0, 15);
+    outcome.eligible = eligible.length;
     outcome.included = selected.length;
 
     if (selected.length === 0) {
