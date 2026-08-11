@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { calibrationSummary, isCalibrationEligible, orderCalibrationBatch, selectCalibrationBatch, type CalibrationCandidate } from "./calibration";
+import { calibrationResponse, calibrationSummary, isCalibrationEligible, orderCalibrationBatch, selectCalibrationBatch, type CalibrationCandidate } from "./calibration";
 
 const candidate = (id: number, aiVerdict: CalibrationCandidate["aiVerdict"], employer = `Werkgever ${id}`): CalibrationCandidate => ({ id, aiVerdict, employer, title: `Vacature ${id}`, location: null, hoursMin: null, hoursMax: null, hoursOriginal: null, salaryMin: null, salaryMax: null, salaryOriginal: null, deadline: null, description: null, originalText: "Tekst" });
 describe("calibration selection", () => {
@@ -27,3 +27,9 @@ describe("batch summary", () => { it("calculates agreement and verdict breakdown
   expect(calibrationSummary([{userVerdict:"interesting",aiVerdict:"interesting"},{userVerdict:"maybe",aiVerdict:"interesting"}])).toEqual({total:2,agreed:1,differed:1,agreementPercentage:50,breakdown:{interesting:1,maybe:1,not_suitable:0}});
 }); });
 it("does not import or call OpenAI", () => { expect(vi.isMockFunction(selectCalibrationBatch)).toBe(false); });
+
+describe("calibration vote persistence", () => {
+  it("returns the verdict persisted by the database after a racing submission", () => {
+    expect(calibrationResponse({ verdict: "interesting" as const, score: 80 }, "maybe")).toMatchObject({ userVerdict: "maybe", agreed: false });
+  });
+});

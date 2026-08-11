@@ -5,6 +5,9 @@ describe("feedback learning migration", () => {
   it("adds a false, non-null default without rewriting old feedback", () => {
     const sql = readFileSync("drizzle/0004_feedback_learning_eligible.sql", "utf8");
     expect(sql).toContain('ADD COLUMN "learning_eligible" boolean DEFAULT false NOT NULL');
+    expect(sql).toMatch(/learning_eligible[^;]+;\s*--> statement-breakpoint\s*ALTER TABLE[\s\S]+ai_verdict/);
+    expect(sql).toContain('ADD COLUMN "ai_verdict" "feedback_value";');
+    expect(sql).not.toMatch(/ai_verdict[^;]*NOT NULL/i);
     expect(sql).not.toMatch(/UPDATE\s+"?feedback"?/i);
     expect(sql).not.toMatch(/DELETE\s+FROM/i);
   });

@@ -66,7 +66,7 @@ try {
         .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active: true, vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
     }
   }
-  await reconcileSuccessfulSourceRun(source.id, run.id);
+  if (warnings.length === 0) await reconcileSuccessfulSourceRun(source.id, run.id);
   await db.update(sourceRuns).set({ status: warnings.length ? "warning" : "success", finishedAt: new Date(), resultCount: results.length, newCount: added, changedCount: changed, warnings }).where(eq(sourceRuns.id, run.id));
   console.log(`${results.length} vacatures; ${added} nieuw; ${changed} gewijzigd; ${warnings.length} waarschuwingen.`);
 } catch (error) {

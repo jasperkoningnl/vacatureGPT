@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { extractSalary } from "./shared/salary-parser";
+import { activeForDiscoveredOccurrence } from "../vacancy-lifecycle";
 import { describe, expect, it, vi } from "vitest";
 import { discoverVillamedia, matchVillamediaOccurrence, parseOverview, parseVillamediaDetail, parseVillamediaHours, VILLAMEDIA_OVERVIEW_URL, type OverviewVacancy } from "./villamedia-parser";
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -59,6 +60,7 @@ describe("Villamedia parser", () => {
     const { status, ...fields } = expected;
     expect(result).toMatchObject(fields);
     expect((result.rawData as { extracted: { salaryStatus: string } }).extracted.salaryStatus).toBe(status);
+    if (expected.isStage) expect(activeForDiscoveredOccurrence(result)).toBe(false);
     if (expected.status === "qualitative") {
       expect(result.salaryOriginal).toContain("Salaris afhankelijk van kennis");
       expect(result.salaryOriginal).toContain("Salarisindicatie: Arbeidsvoorwaarden");

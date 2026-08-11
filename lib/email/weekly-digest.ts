@@ -5,20 +5,21 @@ export type DigestVacancy = {
   id: number; title: string; employer: string; location: string | null; active: boolean;
   hoursMin: number | null; hoursMax: number | null; hoursOriginal: string | null;
   salaryMin: number | null; salaryMax: number | null; salaryPeriod: string | null; salaryOriginal: string | null;
-  firstSeenAt: Date; score: number; verdict: Verdict; reviewed: boolean;
+  firstSeenAt: Date; score: number; verdict: Verdict; feedbackValue: Verdict | null;
 };
 
 export function digestBoundary(now: Date, lastSuccessfulSentAt: Date | null) {
-  return lastSuccessfulSentAt ?? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1_000);
+  return lastSuccessfulSentAt ? null : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1_000);
 }
 
-export function selectWeeklyVacancies(input: DigestVacancy[], boundary: Date, successfullyEmailedIds: Set<number>, limit = WEEKLY_DIGEST_LIMIT) {
+export function selectWeeklyVacancies(input: DigestVacancy[], firstDigestBoundary: Date | null, successfullyEmailedIds: Set<number>, limit = WEEKLY_DIGEST_LIMIT) {
   return input
     .filter((vacancy) => vacancy.active)
-    .filter((vacancy) => vacancy.firstSeenAt > boundary)
+    .filter((vacancy) => firstDigestBoundary === null || vacancy.firstSeenAt > firstDigestBoundary)
     .filter((vacancy) => !successfullyEmailedIds.has(vacancy.id))
+    .filter((vacancy) => vacancy.feedbackValue !== "not_suitable")
     .filter((vacancy) => vacancy.verdict !== "not_suitable" && scoreToVerdict(vacancy.score) !== "not_suitable")
-    .sort((a, b) => Number(a.reviewed) - Number(b.reviewed) || b.score - a.score || b.firstSeenAt.getTime() - a.firstSeenAt.getTime() || a.id - b.id)
+    .sort((a, b) => Number(a.feedbackValue !== null) - Number(b.feedbackValue !== null) || b.score - a.score || b.firstSeenAt.getTime() - a.firstSeenAt.getTime() || a.id - b.id)
     .slice(0, limit);
 }
 

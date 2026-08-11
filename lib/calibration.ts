@@ -9,6 +9,9 @@ export type CalibrationCandidate = {
   deadline: Date | null; description: string | null; originalText: string; aiVerdict: Verdict;
 };
 export type BlindVacancy = Omit<CalibrationCandidate, "aiVerdict">;
+export function calibrationResponse<T extends { verdict: Verdict }>(assessment: T, persistedVerdict: Verdict) {
+  return { ...assessment, userVerdict: persistedVerdict, agreed: assessment.verdict === persistedVerdict };
+}
 export function isCalibrationEligible(value: { active: boolean; aiVerdict: Verdict | null; hasFeedback: boolean }) { return value.active && value.aiVerdict !== null && !value.hasFeedback; }
 
 const target: Verdict[] = ["interesting", "interesting", "interesting", "maybe", "not_suitable"];

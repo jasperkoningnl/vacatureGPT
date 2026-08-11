@@ -69,7 +69,7 @@ export default function CalibrationFlow({ vacancies }: { vacancies: BlindVacancy
     <article className="vacancy-review">
       <dl className="metadata"><div><dt>Locatie</dt><dd>{vacancy.location || "Niet vermeld"}</dd></div><div><dt>Uren</dt><dd>{formatHours(vacancy)}</dd></div><div><dt>Salaris</dt><dd>{formatSalary(vacancy)}</dd></div><div><dt>Deadline</dt><dd>{vacancy.deadline ? new Date(vacancy.deadline).toLocaleDateString("nl-NL") : "Niet vermeld"}</dd></div></dl>
       <VacancyContent text={vacancy.description || vacancy.originalText} bounded/>
-      <Link className="read-more" href={`/vacatures/${vacancy.id}`}>Lees volledige vacature</Link>
+      <Link className="read-more" href={`/kalibreren/vacatures/${vacancy.id}`}>Lees volledige vacature</Link>
     </article>
     {!reveal ? <section className="decision"><h2>Wat vind jij van deze vacature?</h2><div className="choice-grid">{(Object.keys(verdictLabels) as Verdict[]).map((value) => <button disabled={pending} className="choice" key={value} onClick={() => choose(value)}>{verdictLabels[value]}</button>)}</div></section>
       : <section className={`reveal ${reveal.agreed ? "agreement" : "disagreement"}`} aria-live="polite">
