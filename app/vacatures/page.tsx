@@ -26,7 +26,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
     url: vacancyOccurrences.sourceUrl, source: sources.name, feedback: feedback.value,
     aiScore: aiAssessments.score, aiVerdict: aiAssessments.verdict,
   }).from(vacancies)
-    .innerJoin(vacancyOccurrences, eq(vacancies.id, vacancyOccurrences.vacancyId))
+    .innerJoin(vacancyOccurrences, and(eq(vacancies.id, vacancyOccurrences.vacancyId), eq(vacancyOccurrences.active, true)))
     .innerJoin(sources, eq(vacancyOccurrences.sourceId, sources.id))
     .leftJoin(feedback, eq(vacancies.id, feedback.vacancyId))
     .leftJoin(aiAssessments, eq(vacancies.id, aiAssessments.vacancyId))

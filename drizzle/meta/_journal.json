@@ -22,6 +22,13 @@
       "when": 1786306937812,
       "tag": "0002_wide_red_wolf",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786410000000,
+      "tag": "0003_vacancy_occurrence_active",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
+import { isVacancyGone } from "./vacancy-gone";
 import { detectStage, extractSalary } from "./shared/salary-parser";
 import { createIngestionWarning } from "./shared/ingestion-warnings";
 
@@ -149,18 +150,20 @@ export function batchFailureReason(discovered: number, results: VillamediaVacanc
 
 export async function fetchVillamedia(fetcher: typeof fetch = fetch) {
   const discovery = await discoverVillamedia(fetcher);
-  const results: VillamediaVacancy[] = []; const warnings: string[] = [];
+  const results: VillamediaVacancy[] = []; const warnings: string[] = []; const goneUrls: string[] = [];
   for (const entry of discovery.entries) {
     if (results.length || warnings.length) await new Promise((resolve) => setTimeout(resolve, process.env.NODE_ENV === "test" ? 0 : 1100));
     try {
       const response = await fetcher(entry.sourceUrl, { headers: { "user-agent": "VacatureGPT/1.0 personal vacancy search" } });
+      const html = await response.text();
+      if (isVacancyGone("villamedia", response.url || entry.sourceUrl, html)) { goneUrls.push(entry.sourceUrl); continue; }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const parsed = parseVillamediaDetail(await response.text(), entry);
+      const parsed = parseVillamediaDetail(html, entry);
       if (!parsed.originalText || !parsed.title) throw new Error("geen bruikbare vacaturetekst of titel");
       results.push(parsed);
     } catch (error) { warnings.push(createIngestionWarning({ severity: "warning", category: "fetch", url: entry.sourceUrl, message: `Vacature kon niet worden gelezen — ${error instanceof Error ? error.message : "onbekende parseerfout"}. Deze vacature is deze run overgeslagen.` })); }
   }
-  return { ...discovery, results, failedCount: discovery.entries.length - results.length, warnings };
+  return { ...discovery, results, failedCount: discovery.entries.length - results.length - goneUrls.length, warnings, goneUrls };
 }
 
 export function matchVillamediaOccurrence(item: Pick<VillamediaVacancy, "externalId" | "sourceUrl" | "canonicalKey">, occurrences: Array<{ externalId: string | null; sourceUrl: string; vacancyId: number; canonicalKey?: string }>) {

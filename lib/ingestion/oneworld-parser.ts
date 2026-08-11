@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
 import { createIngestionWarning, parseIngestionWarning } from "./shared/ingestion-warnings";
+import { isVacancyGone } from "./vacancy-gone";
 
 export const RSS_URL = "https://www.oneworld.nl/wpjobboard/xml/rss/?category=7&type=3&meta%5Bworkload%5D=32-36";
 export const UNKNOWN_EMPLOYER = "Onbekende werkgever";
@@ -198,13 +199,16 @@ const detailDelay = () => new Promise((resolve) => setTimeout(resolve, process.e
 export async function fetchOneWorldUrls(urls: string[], fetcher: typeof fetch = fetch) {
   const uniqueUrls = [...new Set(urls)];
   const results: NormalizedVacancy[] = [];
+  const goneUrls: string[] = [];
   const fetchWarnings: string[] = [];
   for (const url of uniqueUrls) {
     await detailDelay();
     try {
       const response = await fetcher(url, { headers: { "user-agent": ONE_WORLD_USER_AGENT } });
+      const html = await response.text();
+      if (isVacancyGone("oneworld", response.url || url, html)) { goneUrls.push(url); continue; }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      results.push(parseDetail(await response.text(), url));
+      results.push(parseDetail(html, url));
     } catch (error) {
       fetchWarnings.push(createIngestionWarning({ severity: "warning", category: "fetch", url, message: `Vacature kon niet worden gelezen — ${error instanceof Error ? error.message : "onbekende parseerfout"}. Deze vacature is deze run overgeslagen.` }));
     }
@@ -214,6 +218,7 @@ export async function fetchOneWorldUrls(urls: string[], fetcher: typeof fetch = 
     warnings: [...fetchWarnings, ...qualityWarnings(results)],
     failedCount: fetchWarnings.length,
     requestedCount: uniqueUrls.length,
+    goneUrls,
   };
 }
 

@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sourceRuns, sources, vacancies, vacancyOccurrences } from "../lib/db/schema";
+import { expireKnownGoneUrls, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
 import { batchFailureReason, CULTURELE_BASE_URL, fetchCulturele, mergeReliable, type CultureleVacancy } from "../lib/ingestion/culturele-vacatures-parser";
 import { createIngestionWarning, parseIngestionWarning, runStatusForWarnings, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
 
@@ -29,11 +30,12 @@ async function writeSummary(counts: { pages: number; discovered: number; parsed:
 
 try {
   const fetched = await fetchCulturele();
+  await expireKnownGoneUrls(source.id, fetched.goneUrls);
   const warnings = [...fetched.warnings, ...fetched.results.flatMap((item) => item.warnings.map((warning) => createIngestionWarning({ ...parseIngestionWarning(warning), url: item.sourceUrl })))];
   const failure = batchFailureReason(fetched.entries.length, fetched.results, fetched.failedCount);
   if (failure) {
     warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `${failure} Er zijn geen vacatures bijgewerkt.` }));
-    await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: fetched.results.length, warnings, error: `${failure} Geen vacaturewrites uitgevoerd.` }).where(eq(sourceRuns.id, run.id));
+  await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: fetched.results.length, warnings, error: `${failure} Geen vacaturewrites uitgevoerd.` }).where(eq(sourceRuns.id, run.id));
     await writeSummary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added: 0, updated: 0, unchanged: 0, deduplicated: 0, failed: fetched.failedCount, warnings });
     throw new Error("Culturele Vacatures-ingestie afgebroken vóór vacaturewrites.");
   }
@@ -57,10 +59,11 @@ try {
       } else if (matched.contentHash === item.contentHash) { unchanged++; await db.update(vacancies).set({ lastSeenAt: new Date() }).where(eq(vacancies.id, vacancyId)); }
       else { updated++; await db.update(vacancies).set({ ...values(item), lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(vacancies.id, vacancyId)); }
     }
-    if (occurrence) await db.update(vacancyOccurrences).set({ sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
-    else await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
-      .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
+    if (occurrence) await db.update(vacancyOccurrences).set({ active: true, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
+    else await db.insert(vacancyOccurrences).values({ active: true, vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
+      .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active: true, vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
   }
+  await reconcileSuccessfulSourceRun(source.id, run.id);
   await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: fetched.results.length, newCount: added, changedCount: updated, warnings }).where(eq(sourceRuns.id, run.id));
   await writeSummary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added, updated, unchanged, deduplicated, failed: fetched.failedCount, warnings });
 } catch (error) {

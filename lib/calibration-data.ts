@@ -15,6 +15,6 @@ export async function getCalibrationBatchByIds(ids: number[]) {
   if (!ids.length) return [];
   const rows = await getDb().select({ id: vacancies.id, title: vacancies.title, employer: vacancies.employer, location: vacancies.location, hoursMin: vacancies.hoursMin, hoursMax: vacancies.hoursMax, hoursOriginal: vacancies.hoursOriginal, salaryMin: vacancies.salaryMin, salaryMax: vacancies.salaryMax, salaryOriginal: vacancies.salaryOriginal, deadline: vacancies.deadline, description: vacancies.description, originalText: vacancies.originalText })
     .from(vacancies).innerJoin(aiAssessments, eq(aiAssessments.vacancyId, vacancies.id))
-    .where(inArray(vacancies.id, ids));
+    .where(and(eq(vacancies.active, true), inArray(vacancies.id, ids)));
   return orderCalibrationBatch(rows, ids);
 }

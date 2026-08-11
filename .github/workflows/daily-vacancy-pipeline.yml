@@ -62,6 +62,11 @@ jobs:
         continue-on-error: true
         run: pnpm ingest:overheid
 
+      - name: Clean up stale vacancy occurrences
+        id: cleanup
+        continue-on-error: true
+        run: pnpm vacancies:cleanup
+
       - name: Assess vacancies with AI
         id: ai
         continue-on-error: true
@@ -74,6 +79,7 @@ jobs:
           VILLAMEDIA_STATUS: ${{ steps.villamedia.outcome }}
           CULTURELE_STATUS: ${{ steps.culturele.outcome }}
           OVERHEID_STATUS: ${{ steps.overheid.outcome }}
+          CLEANUP_STATUS: ${{ steps.cleanup.outcome }}
           AI_STATUS: ${{ steps.ai.outcome }}
         run: |
           status_label() {
@@ -93,6 +99,7 @@ jobs:
             echo "| Villamedia | $(status_label "$VILLAMEDIA_STATUS") |"
             echo "| Culturele Vacatures | $(status_label "$CULTURELE_STATUS") |"
             echo "| Werken bij de Overheid | $(status_label "$OVERHEID_STATUS") |"
+            echo "| Expiry cleanup | $(status_label "$CLEANUP_STATUS") |"
             echo "| AI assessment | $(status_label "$AI_STATUS") |"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -103,6 +110,7 @@ jobs:
           VILLAMEDIA_STATUS: ${{ steps.villamedia.outcome }}
           CULTURELE_STATUS: ${{ steps.culturele.outcome }}
           OVERHEID_STATUS: ${{ steps.overheid.outcome }}
+          CLEANUP_STATUS: ${{ steps.cleanup.outcome }}
           AI_STATUS: ${{ steps.ai.outcome }}
         run: |
           for status in \
@@ -110,6 +118,7 @@ jobs:
             "$VILLAMEDIA_STATUS" \
             "$CULTURELE_STATUS" \
             "$OVERHEID_STATUS" \
+            "$CLEANUP_STATUS" \
             "$AI_STATUS"; do
             if [ "$status" != "success" ]; then
               echo "One or more ingestion or AI assessment steps failed or were skipped."
