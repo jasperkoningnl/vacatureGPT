@@ -1,5 +1,33 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+
+const statementBreakpoint = "--> statement-breakpoint";
+
+function expectNeonHttpCompatible(sql: string) {
+  const statementsPerBatch = sql.split(statementBreakpoint).map((batch) =>
+    batch
+      .replace(/^\s*--.*$/gm, "")
+      .split(";")
+      .filter((statement) => statement.trim().length > 0),
+  );
+
+  expect(statementsPerBatch.every((statements) => statements.length <= 1)).toBe(true);
+}
+
+describe("Neon HTTP migration compatibility", () => {
+  it.each(["0004_feedback_learning_eligible.sql", "0005_weekly_email_digest.sql"])(
+    "%s separates every executable statement",
+    (migration) => {
+      expectNeonHttpCompatible(readFileSync(`drizzle/${migration}`, "utf8"));
+    },
+  );
+
+  it("keeps every migration compatible with prepared statements", () => {
+    for (const migration of readdirSync("drizzle").filter((file) => file.endsWith(".sql"))) {
+      expectNeonHttpCompatible(readFileSync(`drizzle/${migration}`, "utf8"));
+    }
+  });
+});
 
 describe("feedback learning migration", () => {
   it("adds a false, non-null default without rewriting old feedback", () => {
