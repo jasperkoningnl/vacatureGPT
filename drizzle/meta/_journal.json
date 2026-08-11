@@ -36,6 +36,13 @@
       "when": 1786411000000,
       "tag": "0004_feedback_learning_eligible",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786440000000,
+      "tag": "0005_weekly_email_digest",
+      "breakpoints": true
     }
   ]
 }
