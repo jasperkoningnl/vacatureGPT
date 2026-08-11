@@ -2,9 +2,10 @@ import { appendFile } from "node:fs/promises";
 import OpenAI from "openai";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../lib/db";
-import { aiAssessments, preferences, vacancies, watchedEmployers } from "../lib/db/schema";
+import { aiAssessments, feedback, preferences, vacancies, watchedEmployers } from "../lib/db/schema";
 import { assessVacancy, assessmentIsCurrent, ASSESSMENT_CONFIG } from "../lib/ai/vacancy-assessment";
 import { buildAssessmentProfile, hashProfile } from "../lib/ai/profile";
+import { buildCalibrationContext } from "../lib/ai/calibration-context";
 
 const db = getDb();
 const [preference] = await db.select().from(preferences).orderBy(desc(preferences.updatedAt)).limit(1);
@@ -12,6 +13,12 @@ if (!preference) throw new Error("Geen preferences-rij gevonden; voer eerst de b
 const employerRows = await db.select({ name: watchedEmployers.name }).from(watchedEmployers).where(eq(watchedEmployers.enabled, true));
 const profile = buildAssessmentProfile(preference, employerRows.map(({ name }) => name));
 const profileHash = hashProfile(profile);
+const calibrationRows = await db.select({
+  id: feedback.id, learningEligible: feedback.learningEligible, aiVerdict: feedback.aiVerdict,
+  userVerdict: feedback.value, reasonCode: feedback.reasonCode, note: feedback.note,
+  vacancyTitle: vacancies.title, employer: vacancies.employer, updatedAt: feedback.updatedAt,
+}).from(feedback).innerJoin(vacancies, eq(vacancies.id, feedback.vacancyId)).where(eq(feedback.learningEligible, true));
+const calibrationContext = buildCalibrationContext(calibrationRows);
 const activeVacancies = await db.select().from(vacancies).where(eq(vacancies.active, true));
 const existing = activeVacancies.length ? await db.select().from(aiAssessments).where(inArray(aiAssessments.vacancyId, activeVacancies.map(({ id }) => id))) : [];
 const existingByVacancy = new Map(existing.map((assessment) => [assessment.vacancyId, assessment]));
@@ -26,7 +33,7 @@ async function processVacancy(vacancy: (typeof activeVacancies)[number]) {
       hoursMin: vacancy.hoursMin, hoursMax: vacancy.hoursMax, salaryMin: vacancy.salaryMin,
       salaryMax: vacancy.salaryMax, salaryPeriod: vacancy.salaryPeriod, deadline: vacancy.deadline,
       description: vacancy.description, originalText: vacancy.originalText,
-    }, profile);
+    }, profile, calibrationContext);
     const now = new Date();
     await db.insert(aiAssessments).values({
       vacancyId: vacancy.id, vacancyContentHash: vacancy.contentHash, profileHash,

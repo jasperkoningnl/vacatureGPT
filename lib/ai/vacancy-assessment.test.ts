@@ -11,6 +11,7 @@ describe("assessment freshness", () => {
   it("skips an unchanged vacancy and profile", () => expect(assessmentIsCurrent(current, "vacancy-1", "profile-1")).toBe(true));
   it("reassesses changed vacancy content", () => expect(assessmentIsCurrent(current, "vacancy-2", "profile-1")).toBe(false));
   it("reassesses a changed profile", () => expect(assessmentIsCurrent(current, "vacancy-1", "profile-2")).toBe(false));
+  it("does not make unchanged v2 assessments stale when calibration evolves", () => expect(assessmentIsCurrent({ ...current, promptVersion: "vacancy-fit-v2" }, "vacancy-1", "profile-1")).toBe(true));
 });
 
 describe("structured assessment", () => {
@@ -27,10 +28,19 @@ describe("structured assessment", () => {
     const profile = buildAssessmentProfile({ hoursMin: 32, hoursMax: 36, salaryMin: null, primaryCities: [], secondaryCities: [], travelOrigin: "Amersfoort", maxTravelMinutes: 30, roleFamilies: [], positiveIndicators: [], negativeIndicators: [] }, []);
     await assessVacancy({ parse } as never, { title: "Editor", employer: "A", location: null, hoursMin: null, hoursMax: null, salaryMin: null, salaryMax: null, salaryPeriod: null, deadline: null, description: "Redigeert artikelen", originalText: "Redigeert artikelen" }, profile);
     const instructions = parse.mock.calls[0][0].instructions;
-    expect(ASSESSMENT_CONFIG.promptVersion).toBe("vacancy-fit-v2");
+    expect(ASSESSMENT_CONFIG.promptVersion).toBe("vacancy-fit-v3");
     expect(instructions).toContain("clear Dutch");
     expect(instructions).toContain("1–2 short sentences");
     expect(instructions).toContain("concrete");
     expect(parse).toHaveBeenCalledOnce();
+  });
+  it("includes calibration only when supplied", async () => {
+    const parse = vi.fn().mockResolvedValue({ output_parsed: { score: 70, summary: "Concreet.", positives: [], concerns: [] }, usage: null });
+    const profile = buildAssessmentProfile({ hoursMin: 32, hoursMax: 36, salaryMin: null, primaryCities: [], secondaryCities: [], travelOrigin: "Amersfoort", maxTravelMinutes: 30, roleFamilies: [], positiveIndicators: [], negativeIndicators: [] }, []);
+    const vacancy = { title: "Editor", employer: "A", location: null, hoursMin: null, hoursMax: null, salaryMin: null, salaryMax: null, salaryPeriod: null, deadline: null, description: null, originalText: "data" };
+    await assessVacancy({ parse } as never, vacancy, profile);
+    expect(parse.mock.calls[0][0].input).not.toContain("CALIBRATION CONTEXT");
+    await assessVacancy({ parse } as never, vacancy, profile, { eligibleReviews: 3, agreements: 1, disagreements: 2, disagreementReasons: [{ reasonCode: "role", count: 2 }], disagreementPatterns: [], recentExamples: [] });
+    expect(parse.mock.calls[1][0].input).toContain('"reasonCode":"role"');
   });
 });

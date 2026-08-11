@@ -29,6 +29,13 @@
       "when": 1786410000000,
       "tag": "0003_vacancy_occurrence_active",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786411000000,
+      "tag": "0004_feedback_learning_eligible",
+      "breakpoints": true
     }
   ]
 }
