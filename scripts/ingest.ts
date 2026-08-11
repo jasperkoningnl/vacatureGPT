@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
+import { reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
 import { fetchOneWorld, type NormalizedVacancy } from "../lib/ingestion/oneworld";
 
 const db = getDb();
@@ -59,12 +60,13 @@ try {
 
     const occurrence = byExternalId?.occurrence ?? byUrl?.occurrence;
     if (occurrence) {
-      await db.update(vacancyOccurrences).set({ sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
+      await db.update(vacancyOccurrences).set({ active: true, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
     } else {
-      await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
-        .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
+      await db.insert(vacancyOccurrences).values({ active: true, vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
+        .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active: true, vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
     }
   }
+  await reconcileSuccessfulSourceRun(source.id, run.id);
   await db.update(sourceRuns).set({ status: warnings.length ? "warning" : "success", finishedAt: new Date(), resultCount: results.length, newCount: added, changedCount: changed, warnings }).where(eq(sourceRuns.id, run.id));
   console.log(`${results.length} vacatures; ${added} nieuw; ${changed} gewijzigd; ${warnings.length} waarschuwingen.`);
 } catch (error) {

@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
+import { expireKnownGoneUrls, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
 import { fetchOneWorld, fetchOneWorldUrls, matchRepairOccurrence, repairFailureReason, type NormalizedVacancy } from "../lib/ingestion/oneworld-parser";
 import { createIngestionWarning, runStatusForWarnings, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
 
@@ -62,8 +63,9 @@ try {
   const repairUrls = repairOccurrences.map(({ occurrence }) => occurrence.sourceUrl);
   const fetched = isRepair ? await fetchOneWorldUrls(repairUrls) : await fetchOneWorld();
   const { results, failedCount, requestedCount } = fetched;
+  await expireKnownGoneUrls(source.id, fetched.goneUrls);
   const warnings = [...fetched.warnings];
-  const repairFailure = isRepair ? repairFailureReason(requestedCount, results.length, failedCount, warnings) : null;
+  const repairFailure = repairFailureReason(requestedCount, results.length + fetched.goneUrls.length, failedCount, warnings);
   // Validate the complete batch before changing any vacancy or occurrence.
   if (repairFailure) {
     warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `${repairFailure} Er zijn geen vacatures gewijzigd.` }));
@@ -86,7 +88,7 @@ try {
       if (existing.vacancy.contentHash !== item.contentHash || existing.vacancy.canonicalKey !== item.canonicalKey) changed++;
       else unchanged++;
       await db.update(vacancies).set({ ...vacancyValues(item), lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(vacancies.id, existing.vacancy.id));
-      await db.update(vacancyOccurrences).set({ sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, matched.id));
+      await db.update(vacancyOccurrences).set({ active: true, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, matched.id));
       continue;
     }
     // Identity is deliberately resolved before canonical data: corrected employer/title must
@@ -115,12 +117,13 @@ try {
 
     const occurrence = byExternalId?.occurrence ?? byUrl?.occurrence;
     if (occurrence) {
-      await db.update(vacancyOccurrences).set({ sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
+      await db.update(vacancyOccurrences).set({ active: true, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
     } else {
-      await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
-        .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
+      await db.insert(vacancyOccurrences).values({ active: true, vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
+        .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active: true, vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
     }
   }
+  if (!isRepair) await reconcileSuccessfulSourceRun(source.id, run.id);
   await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: results.length, newCount: added, changedCount: changed, warnings }).where(eq(sourceRuns.id, run.id));
   await writeSummary({ requested: requestedCount, parsed: results.length, updated: changed, unchanged, failed: failedCount, duplicates, added, warnings });
 } catch (error) {

@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
+import { expireKnownGoneUrls, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
 import { batchFailureReason, fetchVillamedia, type VillamediaVacancy, VILLAMEDIA_BASE_URL } from "../lib/ingestion/villamedia-parser";
 import { createIngestionWarning, parseIngestionWarning, runStatusForWarnings, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
 
@@ -13,7 +14,7 @@ const [run] = await db.insert(sourceRuns).values({ sourceId: source.id }).return
 function vacancyValues(item: VillamediaVacancy) {
   return { canonicalKey: item.canonicalKey, title: item.title, employer: item.employer, location: item.location, hoursMin: item.hoursMin, hoursMax: item.hoursMax,
     hoursOriginal: item.hoursOriginal, salaryMin: item.salaryMin, salaryMax: item.salaryMax, salaryPeriod: item.salaryPeriod, salaryBasisHours: item.salaryBasisHours,
-    salaryOriginal: item.salaryOriginal, deadline: item.deadline, description: item.originalText, originalText: item.originalText, contentHash: item.contentHash, active: !item.isStage };
+    salaryOriginal: item.salaryOriginal, deadline: item.deadline, description: item.originalText, originalText: item.originalText, contentHash: item.contentHash, active: true };
 }
 async function summary(values: { pages: number; discovered: number; parsed: number; added: number; updated: number; unchanged: number; duplicates: number; failed: number; warnings: string[] }) {
   const lines = ["## Villamedia ingestion summary", "", "| Result | Count |", "| --- | ---: |", `| Overview pages fetched | ${values.pages} |`,
@@ -28,11 +29,12 @@ async function summary(values: { pages: number; discovered: number; parsed: numb
 let fetched: Awaited<ReturnType<typeof fetchVillamedia>> | undefined;
 try {
   fetched = await fetchVillamedia();
+  await expireKnownGoneUrls(source.id, fetched.goneUrls);
   const warnings = [...fetched.warnings, ...fetched.results.flatMap((item) => item.warnings.map((warning) => createIngestionWarning({ ...parseIngestionWarning(warning), url: item.sourceUrl })))];
   const failure = batchFailureReason(fetched.entries.length, fetched.results, fetched.failedCount);
   if (failure) {
     warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `${failure} Er zijn geen vacatures bijgewerkt.` }));
-    await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: fetched.results.length, warnings, error: `${failure} Geen vacaturewrites uitgevoerd.` }).where(eq(sourceRuns.id, run.id));
+  await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: fetched.results.length, warnings, error: `${failure} Geen vacaturewrites uitgevoerd.` }).where(eq(sourceRuns.id, run.id));
     await summary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added: 0, updated: 0, unchanged: 0, duplicates: 0, failed: fetched.failedCount, warnings });
     throw new Error("Villamedia-ingestie afgebroken vóór vacaturewrites.");
   }
@@ -50,10 +52,11 @@ try {
     else { vacancyId = old.id; if (old.contentHash === item.contentHash && old.canonicalKey === item.canonicalKey) unchanged++; else updated++;
       await db.update(vacancies).set({ ...vacancyValues(item), lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(vacancies.id, vacancyId)); }
     const occurrence = byExternal?.occurrence ?? byUrl?.occurrence;
-    if (occurrence) await db.update(vacancyOccurrences).set({ sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
-    else await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
-      .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
+    if (occurrence) await db.update(vacancyOccurrences).set({ active: true, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
+    else await db.insert(vacancyOccurrences).values({ active: true, vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
+      .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active: true, vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
   }
+  await reconcileSuccessfulSourceRun(source.id, run.id);
   await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: fetched.results.length, newCount: added, changedCount: updated, warnings }).where(eq(sourceRuns.id, run.id));
   await summary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added, updated, unchanged, duplicates, failed: fetched.failedCount, warnings });
 } catch (error) {

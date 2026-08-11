@@ -18,7 +18,8 @@
     "ingest:villamedia": "tsx scripts/ingest-villamedia.ts",
     "ingest:culturele": "tsx scripts/ingest-culturele-vacatures.ts",
     "ingest:overheid": "tsx scripts/ingest-werken-bij-de-overheid.ts",
-    "ai:assess": "tsx scripts/assess-vacancies.ts"
+    "ai:assess": "tsx scripts/assess-vacancies.ts",
+    "vacancies:cleanup": "tsx scripts/cleanup-vacancies.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

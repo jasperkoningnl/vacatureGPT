@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
+import { isVacancyGone } from "./vacancy-gone";
 import { createIngestionWarning } from "./shared/ingestion-warnings";
 import { extractSalary } from "./shared/salary-parser";
 
@@ -134,16 +135,17 @@ export function batchFailureReason(discovered: number, parsed: OverheidVacancy[]
 }
 
 export async function fetchOverheid(fetcher: typeof fetch = fetch) {
-  const discovery = await discoverOverheid(fetcher); const results: OverheidVacancy[] = []; const warnings: string[] = [];
+  const discovery = await discoverOverheid(fetcher); const results: OverheidVacancy[] = []; const warnings: string[] = []; const goneUrls: string[] = [];
   for (const entry of discovery.entries) {
     if ((results.length || warnings.length) && process.env.NODE_ENV !== "test") await new Promise((resolve) => setTimeout(resolve, 900));
     try { const response = await fetcher(entry.sourceUrl, { headers: { "user-agent": "VacatureGPT/1.0 personal vacancy search" } });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`); const item = parseOverheidDetail(await response.text(), entry);
+      const html = await response.text(); if (isVacancyGone("werken-bij-de-overheid", response.url || entry.sourceUrl, html)) { goneUrls.push(entry.sourceUrl); continue; }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`); const item = parseOverheidDetail(html, entry);
       if (!item.originalText || !item.title || !item.employer) throw new Error("geen bruikbare vacaturetekst, titel of werkgever"); results.push(item);
     } catch (error) { warnings.push(createIngestionWarning({ severity: "warning", category: "fetch", url: entry.sourceUrl, message: `Vacature kon niet worden gelezen — ${error instanceof Error ? error.message : "onbekende parseerfout"}. Deze vacature is deze run overgeslagen.` })); }
   }
   return { ...discovery, pagesFetched: discovery.pagesFetched + discovery.entries.length, results,
-    failedCount: discovery.entries.length - results.length, warnings };
+    failedCount: discovery.entries.length - results.length - goneUrls.length, warnings, goneUrls };
 }
 
 export function mergeReliable(old: Record<string, unknown>, incoming: Record<string, unknown>) {
