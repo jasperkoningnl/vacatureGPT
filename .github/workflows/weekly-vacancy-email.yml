@@ -1,0 +1,49 @@
+name: Weekly vacancy email
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Tuesday 07:00 UTC, 1 hour and 45 minutes after the daily pipeline starts.
+    - cron: "0 7 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-vacancy-email
+  cancel-in-progress: false
+
+jobs:
+  email:
+    name: Send weekly vacancy email
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      ENABLE_EMAIL: ${{ vars.ENABLE_EMAIL }}
+      APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm 10.28.1
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.1
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run database migrations
+        run: pnpm db:migrate
+
+      - name: Select and send weekly vacancies
+        run: pnpm email:weekly
