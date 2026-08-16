@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { and, asc, desc, eq, ilike, isNotNull, isNull, sql, SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, sql, SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { aiAssessments, feedback, sources, vacancies, vacancyOccurrences } from "@/lib/db/schema";
+import { promisingAiVerdicts } from "@/lib/vacancy-funnel";
 
 export const dynamic = "force-dynamic";
 type Q = { city?: string; employer?: string; source?: string; hours?: string; salary?: string; feedback?: string; ai?: string; sort?: string };
@@ -15,10 +16,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
   if (q.source) filters.push(eq(sources.slug, q.source));
   if (q.salary === "known") filters.push(isNotNull(vacancies.salaryMin));
   if (q.salary === "unknown") filters.push(isNull(vacancies.salaryMin));
-  if (q.feedback) filters.push(eq(feedback.value, q.feedback as keyof typeof verdictLabels));
+  if (q.feedback === "unreviewed") filters.push(isNull(feedback.id));
+  if (q.feedback && q.feedback !== "unreviewed") filters.push(eq(feedback.value, q.feedback as keyof typeof verdictLabels));
   if (q.ai === "unassessed") filters.push(isNull(aiAssessments.id));
-  if (q.ai && q.ai !== "unassessed") filters.push(eq(aiAssessments.verdict, q.ai as keyof typeof verdictLabels));
-  const ordering = q.sort === "deadline" ? asc(vacancies.deadline) : q.sort === "ai-score" ? sql`${aiAssessments.score} desc nulls last` : desc(vacancies.firstSeenAt);
+  if (q.ai === "promising") filters.push(inArray(aiAssessments.verdict, promisingAiVerdicts));
+  if (q.ai && q.ai !== "unassessed" && q.ai !== "promising") filters.push(eq(aiAssessments.verdict, q.ai as keyof typeof verdictLabels));
+  const ordering = q.sort === "deadline" ? asc(vacancies.deadline) : q.sort === "ai-score" ? sql`case when ${aiAssessments.verdict} = 'interesting' then 0 when ${aiAssessments.verdict} = 'maybe' then 1 else 2 end, ${aiAssessments.score} desc nulls last, ${vacancies.firstSeenAt} desc` : desc(vacancies.firstSeenAt);
   const rows = await getDb().select({
     id: vacancies.id, title: vacancies.title, employer: vacancies.employer, location: vacancies.location,
     hoursMin: vacancies.hoursMin, hoursMax: vacancies.hoursMax, salaryMin: vacancies.salaryMin,
@@ -33,16 +36,16 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
     .where(and(...filters)).orderBy(ordering);
 
   const sourceOptions=await getDb().select({slug:sources.slug,name:sources.name}).from(sources).orderBy(asc(sources.name));
-  return <><div className="page-title"><div><p className="eyebrow">Volledige database</p><h1>Vacatures</h1></div><span className="muted">{rows.length} resultaten</span></div><form className="filters">
+  return <><div className="page-title"><div><p className="eyebrow">Volledige actieve vacaturelijst</p><h1>Alle vacatures</h1></div><span className="muted">{rows.length} resultaten</span></div><form className="filters">
     <input name="city" placeholder="Stad" defaultValue={q.city}/><input name="employer" placeholder="Werkgever" defaultValue={q.employer}/>
     <select name="source" defaultValue={q.source}><option value="">Alle bronnen</option>{sourceOptions.map(x=><option key={x.slug} value={x.slug}>{x.name}</option>)}</select>
     <select name="salary" defaultValue={q.salary}><option value="">Salaris: alle</option><option value="known">Bekend</option><option value="unknown">Onbekend</option></select>
-    <select name="feedback" defaultValue={q.feedback}><option value="">Feedback: alle</option><option value="interesting">Interessant</option><option value="maybe">Misschien</option><option value="not_suitable">Niet passend</option></select>
-    <select name="ai" defaultValue={q.ai}><option value="">Alle AI-oordelen</option><option value="interesting">Interessant</option><option value="maybe">Misschien</option><option value="not_suitable">Niet passend</option><option value="unassessed">Nog niet beoordeeld</option></select>
+    <select name="feedback" defaultValue={q.feedback}><option value="">Jaspers oordeel: alle</option><option value="unreviewed">Nog niet beoordeeld</option><option value="interesting">Interessant</option><option value="maybe">Misschien</option><option value="not_suitable">Niet passend</option></select>
+    <select name="ai" defaultValue={q.ai}><option value="">Alle AI-oordelen</option><option value="promising">Waarschijnlijk passend</option><option value="interesting">Interessant</option><option value="maybe">Misschien</option><option value="not_suitable">Niet passend</option><option value="unassessed">Nog geen AI-oordeel</option></select>
     <select name="sort" defaultValue={q.sort}><option value="newest">Nieuwste</option><option value="deadline">Deadline</option><option value="ai-score">Beste match</option></select><button>Filter</button>
   </form><div className="table-wrap"><table className="vacancy-table"><thead><tr><th>Vacature</th><th>Beoordelingen</th><th>Locatie</th><th>Uren</th><th>Salaris</th><th>Deadline</th><th>Bron</th></tr></thead><tbody>{rows.map((r) => <tr key={`${r.id}-${r.url}`}>
     <td><Link href={`/vacatures/${r.id}`}><b>{r.title}</b></Link><br/><span className="muted">{r.employer}</span></td>
-    <td><div className="judgements"><span className="ai-badge">AI: {r.aiScore === null || r.aiVerdict === null ? "Nog niet beoordeeld" : `${r.aiScore} · ${verdictLabels[r.aiVerdict]}`}</span><span className="user-badge">Jij: {r.feedback?verdictLabels[r.feedback]:"Nog geen oordeel"}</span></div></td>
+    <td><div className="judgements"><span className="ai-badge">AI: {r.aiScore === null || r.aiVerdict === null ? "Nog geen oordeel" : `${r.aiScore} · ${verdictLabels[r.aiVerdict]}`}</span><span className="user-badge">Jasper: {r.feedback?verdictLabels[r.feedback]:"Nog geen oordeel"}</span></div></td>
     <td>{r.location ?? "Niet vermeld"}</td><td>{r.hoursMin ? `${r.hoursMin}${r.hoursMax ? `–${r.hoursMax}` : ""} uur` : "Uren onbekend"}</td>
     <td>{r.salaryMin ? `€ ${r.salaryMin.toLocaleString("nl-NL")}${r.salaryMax ? `–${r.salaryMax.toLocaleString("nl-NL")}` : ""}` : (r.salaryOriginal ? "Niet gekwantificeerd" : "Niet vermeld")}</td>
     <td>{r.deadline?.toLocaleDateString("nl-NL") ?? "Niet vermeld"}</td><td><a href={r.url} target="_blank" rel="noreferrer">{r.source} ↗</a></td>
