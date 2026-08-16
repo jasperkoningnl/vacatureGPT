@@ -1,18 +1,36 @@
 import Link from "next/link";
-import { and, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
-import { getDb } from "@/lib/db";
-import { aiAssessments, feedback, sourceRuns, sources, vacancies } from "@/lib/db/schema";
+import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { verdictLabels } from "@/lib/calibration";
-import { categoryLabel, parseIngestionWarning, sourceHealth, warningCounts } from "@/lib/ingestion/shared/ingestion-warnings";
+import { getDb } from "@/lib/db";
+import { aiAssessments, feedback, vacancies } from "@/lib/db/schema";
+import { promisingAiVerdicts } from "@/lib/vacancy-funnel";
+
 export const dynamic = "force-dynamic";
-function Notices({values}:{values:string[]}){if(!values.length)return null;const counts=warningCounts(values);return <details className="notices"><summary>{counts.critical+counts.warning} aandachtspunt(en)</summary>{values.map((value,i)=>{const item=parseIngestionWarning(value);return <div className={`notice notice-${item.severity}`} key={i}><b>{categoryLabel(item.category)}</b><br/>{item.message}</div>})}</details>}
-const hours=(x:{hoursMin:number|null;hoursMax:number|null})=>x.hoursMin?`${x.hoursMin}${x.hoursMax&&x.hoursMax!==x.hoursMin?`–${x.hoursMax}`:""} uur`:"Uren onbekend";
-export default async function Home(){const db=getDb();const [[recent],[interesting],[reviewed],[waiting],cards,runs,activeRuns]=await Promise.all([
- db.select({n:count()}).from(vacancies).where(and(eq(vacancies.active,true),gte(vacancies.firstSeenAt,sql`now() - interval '7 days'`))),
- db.select({n:count()}).from(vacancies).innerJoin(aiAssessments,eq(aiAssessments.vacancyId,vacancies.id)).where(and(eq(vacancies.active,true),eq(aiAssessments.verdict,"interesting"))),
- db.select({n:count()}).from(feedback),
- db.select({n:count()}).from(vacancies).innerJoin(aiAssessments,eq(aiAssessments.vacancyId,vacancies.id)).leftJoin(feedback,eq(feedback.vacancyId,vacancies.id)).where(and(eq(vacancies.active,true),isNull(feedback.id))),
- db.select({id:vacancies.id,title:vacancies.title,employer:vacancies.employer,location:vacancies.location,hoursMin:vacancies.hoursMin,hoursMax:vacancies.hoursMax,salaryMin:vacancies.salaryMin,salaryMax:vacancies.salaryMax,salaryOriginal:vacancies.salaryOriginal,deadline:vacancies.deadline,score:aiAssessments.score,verdict:aiAssessments.verdict}).from(vacancies).innerJoin(aiAssessments,eq(aiAssessments.vacancyId,vacancies.id)).where(and(eq(vacancies.active,true),eq(aiAssessments.verdict,"interesting"))).orderBy(desc(vacancies.firstSeenAt),desc(aiAssessments.score)).limit(5),
- db.select({name:sources.name,status:sourceRuns.status,finished:sourceRuns.finishedAt,count:sourceRuns.resultCount,warnings:sourceRuns.warnings}).from(sourceRuns).innerJoin(sources,eq(sourceRuns.sourceId,sources.id)).orderBy(desc(sourceRuns.startedAt)).limit(5),
- db.select({id:sources.id,status:sourceRuns.status}).from(sources).leftJoin(sourceRuns,eq(sources.id,sourceRuns.sourceId)).where(eq(sources.enabled,true)).orderBy(desc(sourceRuns.startedAt))]);
- const latest=[...new Map(activeRuns.map(r=>[r.id,r])).values()];return <><section className="hero"><div><p className="eyebrow">Jouw vacatureselectie</p><h1>Maak ruimte voor werk dat bij je past.</h1><p className="lead">Er wachten <b>{waiting.n}</b> door AI beoordeelde vacatures op jouw eigen oordeel.</p></div><Link className="button button-large" href="/kalibreren">Beoordeel 5 vacatures</Link></section><section className="metrics" aria-label="Samenvatting"><div><span>Nieuwe vacatures deze week</span><strong>{recent.n}</strong></div><div><span>AI: interessant</span><strong>{interesting.n}</strong></div><div><span>Door mij beoordeeld</span><strong>{reviewed.n}</strong></div><div><span>Nog te beoordelen</span><strong>{waiting.n}</strong></div></section><section className="section-head"><div><p className="eyebrow">Om te bekijken</p><h2>Nieuwe interessante vacatures</h2></div><Link href="/vacatures?ai=interesting&sort=ai-score">Bekijk alle vacatures →</Link></section><div className="vacancy-cards">{cards.map(x=><Link className="vacancy-card" href={`/vacatures/${x.id}`} key={x.id}><div><h3>{x.title}</h3><p>{x.employer}</p></div><span className="ai-badge">AI {x.score} · {verdictLabels[x.verdict]}</span><dl><div><dt>Locatie</dt><dd>{x.location||"Niet vermeld"}</dd></div><div><dt>Uren</dt><dd>{hours(x)}</dd></div><div><dt>Salaris</dt><dd>{x.salaryMin?`€ ${x.salaryMin.toLocaleString("nl-NL")}${x.salaryMax?`–${x.salaryMax.toLocaleString("nl-NL")}`:""}`:x.salaryOriginal||"Niet vermeld"}</dd></div><div><dt>Deadline</dt><dd>{x.deadline?.toLocaleDateString("nl-NL")||"Niet vermeld"}</dd></div></dl></Link>)}{!cards.length&&<p className="muted">Nog geen interessante vacatures gevonden.</p>}</div><section className="operations"><div className="section-head"><div><p className="eyebrow">Systeeminformatie</p><h2>Bronnen en recente runs</h2></div><span className="muted">Brongezondheid: {sourceHealth(latest.map(x=>x.status))}</span></div>{runs.map((run,i)=><div className="run" key={i}><b>{run.name}</b><span>{run.status} · {run.count} resultaten · {run.finished?.toLocaleString("nl-NL")||"bezig"}</span><Notices values={run.warnings}/></div>)}</section></>}
+type FunnelVacancy = { id: number; title: string; employer: string; location: string | null; hoursMin: number | null; hoursMax: number | null; score: number | null; verdict: "interesting" | "maybe" | "not_suitable" | null };
+
+function VacancyCards({ vacancies: rows, empty, showJasper = false }: { vacancies: FunnelVacancy[]; empty: string; showJasper?: boolean }) {
+  return <div className="vacancy-cards">{rows.map((vacancy) => <Link className="vacancy-card" href={`/vacatures/${vacancy.id}`} key={vacancy.id}>
+    <div><h3>{vacancy.title}</h3><p>{vacancy.employer}</p></div>
+    <div className="card-badges"><span className="ai-badge">AI: {vacancy.score === null || vacancy.verdict === null ? "Nog geen oordeel" : `${vacancy.score} · ${verdictLabels[vacancy.verdict]}`}</span>{showJasper && <span className="user-badge">Jasper: Interessant</span>}</div>
+    <dl><div><dt>Locatie</dt><dd>{vacancy.location || "Niet vermeld"}</dd></div><div><dt>Uren</dt><dd>{vacancy.hoursMin ? `${vacancy.hoursMin}${vacancy.hoursMax && vacancy.hoursMax !== vacancy.hoursMin ? `–${vacancy.hoursMax}` : ""} uur` : "Uren onbekend"}</dd></div></dl>
+  </Link>)}{!rows.length && <p className="muted funnel-empty">{empty}</p>}</div>;
+}
+
+export default async function Home() {
+  const db = getDb();
+  const reviewFilter = and(eq(vacancies.active, true), isNull(feedback.id), inArray(aiAssessments.verdict, promisingAiVerdicts));
+  const suitableFilter = and(eq(vacancies.active, true), eq(feedback.value, "interesting"));
+  const select = { id: vacancies.id, title: vacancies.title, employer: vacancies.employer, location: vacancies.location, hoursMin: vacancies.hoursMin, hoursMax: vacancies.hoursMax, score: aiAssessments.score, verdict: aiAssessments.verdict };
+  const [[toReviewCount], [suitableCount], toReview, suitable] = await Promise.all([
+    db.select({ n: count() }).from(vacancies).innerJoin(aiAssessments, eq(aiAssessments.vacancyId, vacancies.id)).leftJoin(feedback, eq(feedback.vacancyId, vacancies.id)).where(reviewFilter),
+    db.select({ n: count() }).from(vacancies).innerJoin(feedback, eq(feedback.vacancyId, vacancies.id)).where(suitableFilter),
+    db.select(select).from(vacancies).innerJoin(aiAssessments, eq(aiAssessments.vacancyId, vacancies.id)).leftJoin(feedback, eq(feedback.vacancyId, vacancies.id)).where(reviewFilter).orderBy(sql`case when ${aiAssessments.verdict} = 'interesting' then 0 else 1 end`, desc(aiAssessments.score), desc(vacancies.firstSeenAt)).limit(6),
+    db.select(select).from(vacancies).leftJoin(aiAssessments, eq(aiAssessments.vacancyId, vacancies.id)).innerJoin(feedback, eq(feedback.vacancyId, vacancies.id)).where(suitableFilter).orderBy(desc(feedback.updatedAt), desc(vacancies.firstSeenAt)).limit(5),
+  ]);
+  return <>
+    <section className="hero"><div><p className="eyebrow">AI schift → Jasper beoordeelt</p><h1>De beste vacatures blijven over.</h1><p className="lead">Begin bij de kansrijke vacatures die nog op jouw oordeel wachten.</p></div><Link className="button button-large" href="/vacatures?feedback=unreviewed&ai=promising&sort=ai-score">Bekijk te beoordelen</Link></section>
+    <section className="metrics funnel-metrics" aria-label="Vacaturefunnel"><div><span>Te beoordelen</span><strong>{toReviewCount.n}</strong></div><div><span>Geschikt bevonden</span><strong>{suitableCount.n}</strong></div></section>
+    <section className="funnel-section"><div className="section-head"><div><p className="eyebrow">Jouw volgende stap</p><h2>Te beoordelen</h2><p className="muted">Actieve vacatures die AI waarschijnlijk passend vindt en die jij nog niet hebt beoordeeld.</p></div><Link href="/vacatures?feedback=unreviewed&ai=promising&sort=ai-score">Alle te beoordelen →</Link></div><VacancyCards vacancies={toReview} empty="Er wachten geen kansrijke vacatures op je oordeel." /></section>
+    <section className="funnel-section"><div className="section-head"><div><p className="eyebrow">Jouw oordeel</p><h2>Geschikt</h2><p className="muted">Actieve vacatures die jij als interessant hebt beoordeeld.</p></div><Link href="/vacatures?feedback=interesting">Alle geschikte →</Link></div><VacancyCards vacancies={suitable} empty="Je hebt nog geen actieve vacatures als geschikt beoordeeld." showJasper /></section>
+  </>;
+}
