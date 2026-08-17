@@ -6,7 +6,7 @@ import { saveFeedback, type FeedbackState } from "@/app/actions";
 
 type Value = "interesting" | "maybe" | "not_suitable";
 
-const choices: { value: Value; label: string }[] = [
+export const feedbackChoices: { value: Value; label: string }[] = [
   { value: "interesting", label: "Interessant" },
   { value: "maybe", label: "Misschien" },
   { value: "not_suitable", label: "Niet passend" },
@@ -26,12 +26,12 @@ export function FeedbackForm({ vacancyId, current }: { vacancyId: number; curren
     <input type="hidden" name="vacancyId" value={vacancyId}/>
     <fieldset className="feedback-choices">
       <legend className="sr-only">Kies je beoordeling</legend>
-      {choices.map((choice) => <label key={choice.value}>
+      {feedbackChoices.map((choice) => <label key={choice.value}>
         <input type="radio" name="value" value={choice.value} defaultChecked={(selected ?? "maybe") === choice.value}/>
         <span>{choice.label}</span>
       </label>)}
     </fieldset>
-    {current && <p className="current-feedback">Huidig opgeslagen oordeel: <strong>{choices.find((choice) => choice.value === selected)?.label}</strong></p>}
+    {current && <p className="current-feedback">Huidig opgeslagen oordeel: <strong>{feedbackChoices.find((choice) => choice.value === selected)?.label}</strong></p>}
     <div className="feedback-details">
       <label>Reden <select name="reasonCode" defaultValue={current?.reasonCode ?? ""}><option value="">Geen reden</option><option value="role">Functie / inhoud</option><option value="seniority">Niveau / verantwoordelijkheid</option><option value="location">Locatie / reistijd</option><option value="hours">Uren</option><option value="salary">Salaris</option><option value="employer">Werkgever / sector</option><option value="other">Iets anders</option></select></label>
       <label>Notitie <textarea name="note" rows={4} placeholder="Voeg eventueel een notitie toe" defaultValue={current?.note ?? ""}/></label>

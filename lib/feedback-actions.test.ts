@@ -12,6 +12,6 @@ describe("feedback submission safety", () => {
 
   it("returns the database-returned calibration value rather than the submitted input", () => {
     expect(actions).toContain(".returning({value:feedback.value})");
-    expect(actions).toContain("calibrationResponse(ai,stored.value)");
+    expect(actions).toContain("calibrationResponse(ai,storedValue)");
   });
 });
