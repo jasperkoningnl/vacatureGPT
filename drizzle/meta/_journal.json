@@ -43,6 +43,13 @@
       "when": 1786440000000,
       "tag": "0005_weekly_email_digest",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786940000000,
+      "tag": "0006_vacancy_tracking",
+      "breakpoints": true
     }
   ]
 }
