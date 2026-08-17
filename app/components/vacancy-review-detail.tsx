@@ -19,9 +19,9 @@ const salaryText = (vacancy: VacancyDetailData) => {
   return details ? `${range} (${details})` : range;
 };
 
-export function VacancyReviewDetail({ vacancy, review, assessment, concealAssessment = false, sourceUrl, sourceName, backLink }: {
+export function VacancyReviewDetail({ vacancy, review, assessment, concealAssessment = false, sourceUrl, sourceName, backLink, tracking }: {
   vacancy: VacancyDetailData; review: ReactNode; assessment?: AssessmentData | null; concealAssessment?: boolean;
-  sourceUrl?: string | null; sourceName?: string | null; backLink?: { href: string; label: string };
+  sourceUrl?: string | null; sourceName?: string | null; backLink?: { href: string; label: string }; tracking?: ReactNode;
 }) {
   return <article className="vacancy-detail">
     <header className="vacancy-detail-header">
@@ -34,6 +34,11 @@ export function VacancyReviewDetail({ vacancy, review, assessment, concealAssess
       <p className="section-intro">Leg vast of deze vacature bij je past. Dit oordeel helpt ook om toekomstige AI-beoordelingen beter af te stemmen.</p>
       {review}
     </section>
+    {tracking && <section className="tracking-section panel" aria-labelledby="tracking-title">
+      <p className="eyebrow">Jouw vervolgstap · los van beoordelingen</p><h2 id="tracking-title">Shortlist &amp; sollicitatie</h2>
+      <p className="section-intro">Leg apart vast of je serieus verder wilt met deze vacature en waar je sollicitatie staat.</p>
+      {tracking}
+    </section>}
     <section className="detail-section" aria-labelledby="details-title">
       <div className="section-heading"><div><p className="eyebrow">In één oogopslag</p><h2 id="details-title">Vacaturegegevens</h2></div>{sourceUrl && <a className="source-link" href={sourceUrl} target="_blank" rel="noreferrer">Bekijk originele vacature ↗</a>}</div>
       <dl className="detail-metadata panel">
