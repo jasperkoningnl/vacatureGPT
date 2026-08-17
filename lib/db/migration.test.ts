@@ -50,3 +50,36 @@ describe("weekly digest migration", () => {
     expect(sql).not.toMatch(/DELETE|DROP|ALTER\s+TABLE\s+"vacancies"/i);
   });
 });
+
+describe("vacancy tracking migration", () => {
+  const migration = "drizzle/0006_vacancy_tracking.sql";
+
+  it("defines exactly the supported application statuses", () => {
+    const sql = readFileSync(migration, "utf8");
+    const enumDefinition = sql.match(/CREATE TYPE "public"\."application_status" AS ENUM \(([^)]+)\)/);
+
+    expect(enumDefinition?.[1].match(/'[^']+'/g)?.map((value) => value.slice(1, -1))).toEqual([
+      "want_to_apply",
+      "applied",
+      "interview",
+      "rejected",
+      "no_longer_interested",
+    ]);
+  });
+
+  it("allows only one tracking record per vacancy", () => {
+    const sql = readFileSync(migration, "utf8");
+
+    expect(sql).toContain(
+      'CREATE UNIQUE INDEX "vacancy_tracking_vacancy_idx" ON "vacancy_tracking" USING btree ("vacancy_id")',
+    );
+  });
+
+  it("models shortlist independently from the nullable application status", () => {
+    const sql = readFileSync(migration, "utf8");
+
+    expect(sql).toMatch(/"shortlisted_at" timestamp with time zone,\s*"application_status" "application_status",/);
+    expect(sql).not.toMatch(/application_status[^;]*shortlist/i);
+    expect(sql).not.toMatch(/^\s*(?:INSERT|UPDATE)\s+/im);
+  });
+});
