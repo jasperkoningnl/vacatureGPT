@@ -1,0 +1,50 @@
+name: Reassess active vacancy backlog
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "preview kost geen tokens; run herbeoordeelt alles en veroorzaakt OpenAI-kosten"
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - run
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reassess-active-vacancy-backlog
+  cancel-in-progress: false
+
+jobs:
+  reassess:
+    name: ${{ inputs.mode == 'run' && 'Run paid backlog reassessment' || 'Preview backlog reassessment' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install pnpm 10.28.1
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.1
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Preview active backlog (no OpenAI calls or writes)
+        if: ${{ inputs.mode == 'preview' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm ai:reassess:preview
+      - name: Reassess complete active backlog (uses paid OpenAI tokens)
+        if: ${{ inputs.mode == 'run' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: pnpm ai:reassess
