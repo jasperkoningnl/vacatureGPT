@@ -63,6 +63,13 @@ jobs:
         continue-on-error: true
         run: pnpm ingest:overheid
 
+      - name: Import GitHub discovery feed
+        id: discovery
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm ingest:discovery
+
       - name: Clean up stale vacancy occurrences
         id: cleanup
         continue-on-error: true
@@ -81,6 +88,7 @@ jobs:
           VILLAMEDIA_STATUS: ${{ steps.villamedia.outcome }}
           CULTURELE_STATUS: ${{ steps.culturele.outcome }}
           OVERHEID_STATUS: ${{ steps.overheid.outcome }}
+          DISCOVERY_STATUS: ${{ steps.discovery.outcome }}
           CLEANUP_STATUS: ${{ steps.cleanup.outcome }}
           AI_STATUS: ${{ steps.ai.outcome }}
         run: |
@@ -102,6 +110,11 @@ jobs:
             echo "| Villamedia | $(status_label "$VILLAMEDIA_STATUS") |"
             echo "| Culturele Vacatures | $(status_label "$CULTURELE_STATUS") |"
             echo "| Werken bij de Overheid | $(status_label "$OVERHEID_STATUS") |"
+            echo "| GitHub discovery | $(status_label "$DISCOVERY_STATUS") |"
+            echo "| Discovery postings gevonden | ${{ steps.discovery.outputs.found || '0' }} |"
+            echo "| Discovery nieuw geïmporteerd | ${{ steps.discovery.outputs.imported || '0' }} |"
+            echo "| Discovery duplicates overgeslagen | ${{ steps.discovery.outputs.duplicates || '0' }} |"
+            echo "| Discovery fouten | ${{ steps.discovery.outputs.errors || '0' }} |"
             echo "| Expiry cleanup | $(status_label "$CLEANUP_STATUS") |"
             echo "| AI assessment | $(status_label "$AI_STATUS") |"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -121,6 +134,7 @@ jobs:
           VILLAMEDIA_STATUS: ${{ steps.villamedia.outcome }}
           CULTURELE_STATUS: ${{ steps.culturele.outcome }}
           OVERHEID_STATUS: ${{ steps.overheid.outcome }}
+          DISCOVERY_STATUS: ${{ steps.discovery.outcome }}
           CLEANUP_STATUS: ${{ steps.cleanup.outcome }}
           AI_STATUS: ${{ steps.ai.outcome }}
         run: pnpm email:pipeline-failure
@@ -133,6 +147,7 @@ jobs:
           VILLAMEDIA_STATUS: ${{ steps.villamedia.outcome }}
           CULTURELE_STATUS: ${{ steps.culturele.outcome }}
           OVERHEID_STATUS: ${{ steps.overheid.outcome }}
+          DISCOVERY_STATUS: ${{ steps.discovery.outcome }}
           CLEANUP_STATUS: ${{ steps.cleanup.outcome }}
           AI_STATUS: ${{ steps.ai.outcome }}
         run: |
@@ -142,6 +157,7 @@ jobs:
             "$VILLAMEDIA_STATUS" \
             "$CULTURELE_STATUS" \
             "$OVERHEID_STATUS" \
+            "$DISCOVERY_STATUS" \
             "$CLEANUP_STATUS" \
             "$AI_STATUS"; do
             if [ "$status" != "success" ]; then

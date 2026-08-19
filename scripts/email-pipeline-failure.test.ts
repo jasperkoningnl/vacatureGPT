@@ -7,6 +7,7 @@ const successfulSteps = {
   VILLAMEDIA_STATUS: "success",
   CULTURELE_STATUS: "success",
   OVERHEID_STATUS: "success",
+  DISCOVERY_STATUS: "success",
   CLEANUP_STATUS: "success",
   AI_STATUS: "success",
 };
@@ -59,6 +60,12 @@ describe("daily pipeline failure alert", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(sentMessage(fetchMock).body.text).toContain("Villamedia (failure)");
     expect(sentMessage(fetchMock).body.text).not.toContain("OneWorld (failure)");
+  });
+
+  it("reports a discovery importer failure", async () => {
+    const fetchMock = resendSuccess();
+    await sendPipelineFailureAlert(environment({ DISCOVERY_STATUS: "failure" }), fetchMock);
+    expect(sentMessage(fetchMock).body.text).toContain("GitHub discovery (failure)");
   });
 
   it("combines multiple failures into one mail", async () => {

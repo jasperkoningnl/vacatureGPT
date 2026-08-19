@@ -14,6 +14,7 @@ const stepEnvironment = [
   ["Villamedia", "VILLAMEDIA_STATUS"],
   ["Culturele Vacatures", "CULTURELE_STATUS"],
   ["Werken bij de Overheid", "OVERHEID_STATUS"],
+  ["GitHub discovery", "DISCOVERY_STATUS"],
   ["Expiry cleanup", "CLEANUP_STATUS"],
   ["AI assessment", "AI_STATUS"],
 ] as const;
