@@ -100,9 +100,38 @@ GitHub Actions-run: ${runUrl}`;
   return "sent";
 }
 
+export async function sendWeeklyDigestFailureAlert(
+  env: AlertEnvironment = process.env,
+  fetchImplementation: Fetch = fetch,
+): Promise<"sent"> {
+  const apiKey = env.RESEND_API_KEY;
+  const to = env.ALERT_EMAIL;
+  const from = env.EMAIL_FROM;
+  const runId = env.GITHUB_RUN_ID;
+  const runUrl = env.GITHUB_RUN_URL;
+  const missing = [["RESEND_API_KEY", apiKey], ["ALERT_EMAIL", to], ["EMAIL_FROM", from], ["GITHUB_RUN_ID", runId], ["GITHUB_RUN_URL", runUrl]]
+    .filter(([, value]) => !value).map(([name]) => name);
+  if (missing.length > 0) throw new Error(`Weekly-digest-alert kon niet worden verstuurd: ontbrekende configuratie: ${missing.join(", ")}`);
+
+  const response = await fetchImplementation("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `vacaturegpt-weekly-failure-${runId}` },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject: "VacatureGPT: wekelijkse vacaturemail mislukt",
+      text: `De workflow voor de wekelijkse vacaturemail is mislukt.\n\nDatum/tijd (UTC): ${new Date().toISOString()}\n\nGitHub Actions-run: ${runUrl}`,
+    }),
+  });
+  if (!response.ok) throw new Error(`Weekly-digest-alert kon niet worden verstuurd: Resend HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`);
+  console.log(`Eén weekly-digest-alert verstuurd voor GitHub Actions-run ${runId}.`);
+  return "sent";
+}
+
 const isMainModule = process.argv[1]?.endsWith("email-pipeline-failure.ts");
 if (isMainModule) {
-  sendPipelineFailureAlert().catch((error) => {
+  const sendAlert = process.argv.includes("--weekly") ? sendWeeklyDigestFailureAlert : sendPipelineFailureAlert;
+  sendAlert().catch((error) => {
     console.error(error instanceof Error ? error.message : "Pipeline-alert kon niet worden verstuurd: onbekende fout");
     process.exitCode = 1;
   });
