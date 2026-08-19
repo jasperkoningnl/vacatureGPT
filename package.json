@@ -23,7 +23,8 @@
     "ai:reassess": "tsx scripts/assess-vacancies.ts --mode=reassess",
     "vacancies:cleanup": "tsx scripts/cleanup-vacancies.ts",
     "email:pipeline-failure": "tsx scripts/email-pipeline-failure.ts",
-    "email:weekly": "tsx scripts/email-weekly.ts"
+    "email:weekly": "tsx scripts/email-weekly.ts",
+    "email:weekly:test": "tsx scripts/email-weekly-test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
