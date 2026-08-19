@@ -14,8 +14,9 @@ let activeRunId: number | null = null;
 async function writeSummary(result: Outcome) {
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (!summary) return;
-  const noMatch = result.message === "Geen nieuwe geschikte vacatures voor deze week" ? "\nGeen nieuwe geschikte vacatures voor deze week\n" : "";
-  await appendFile(summary, `## Weekly vacancy email\n\n- Eligible candidates: ${result.eligible}\n- Included: ${result.included}\n- Status: ${result.status}\n${noMatch}`);
+  const sent = result.status === "sent" ? result.included : 0;
+  const detail = result.status === "failed" ? `\n- Error: ${result.message.replaceAll("\n", " ")}` : `\n- Detail: ${result.message}`;
+  await appendFile(summary, `## Weekly vacancy email\n\n- Eligible candidates: ${result.eligible}\n- Sent: ${sent}\n- Status: ${result.status}${detail}\n`);
 }
 
 try {
@@ -31,13 +32,20 @@ try {
       id: vacancies.id, title: vacancies.title, employer: vacancies.employer, location: vacancies.location, active: vacancies.active,
       hoursMin: vacancies.hoursMin, hoursMax: vacancies.hoursMax, hoursOriginal: vacancies.hoursOriginal,
       salaryMin: vacancies.salaryMin, salaryMax: vacancies.salaryMax, salaryPeriod: vacancies.salaryPeriod, salaryOriginal: vacancies.salaryOriginal,
+      deadline: vacancies.deadline,
       firstSeenAt: vacancies.firstSeenAt, score: aiAssessments.score, verdict: aiAssessments.verdict, feedbackValue: feedback.value,
     }).from(vacancies).innerJoin(aiAssessments, eq(vacancies.id, aiAssessments.vacancyId)).leftJoin(feedback, eq(vacancies.id, feedback.vacancyId));
     const candidates: DigestVacancy[] = rows;
     const boundary = digestBoundary(now, lastSuccessful?.sentAt ?? null);
     const sentIds = new Set(sentRows.map((row) => row.vacancyId));
     const eligible = selectWeeklyVacancies(candidates, boundary, sentIds, Number.MAX_SAFE_INTEGER);
-    const selected = eligible.slice(0, 15);
+    const existingItems = existingRun
+      ? await db.select({ vacancyId: emailDigestItems.vacancyId }).from(emailDigestItems).where(eq(emailDigestItems.runId, existingRun.id))
+      : [];
+    const retryIds = new Set(existingItems.map(({ vacancyId }) => vacancyId));
+    const selected = retryIds.size > 0
+      ? rows.filter((vacancy) => retryIds.has(vacancy.id))
+      : eligible.slice(0, 15);
     outcome.eligible = eligible.length;
     outcome.included = selected.length;
 
@@ -48,6 +56,9 @@ try {
     } else {
       const [run] = await db.insert(emailDigestRuns).values({ runKey, status: "pending" }).onConflictDoUpdate({ target: emailDigestRuns.runKey, set: { status: "pending", error: null } }).returning();
       activeRunId = run.id;
+      // Persist the exact payload before the provider call. A retry then reuses the
+      // same vacancies and Resend idempotency key, while only a sent run counts as delivered.
+      await db.insert(emailDigestItems).values(selected.map((vacancy) => ({ runId: run.id, vacancyId: vacancy.id }))).onConflictDoNothing();
       const apiKey = process.env.RESEND_API_KEY;
       const to = process.env.ALERT_EMAIL;
       const from = process.env.EMAIL_FROM;
@@ -61,7 +72,6 @@ try {
         throw new Error(`Resend heeft verzending geweigerd (HTTP ${response.status})`);
       }
       const provider = await response.json() as { id?: string };
-      await db.insert(emailDigestItems).values(selected.map((vacancy) => ({ runId: run.id, vacancyId: vacancy.id }))).onConflictDoNothing();
       await db.update(emailDigestRuns).set({ status: "sent", sentAt: now, providerMessageId: provider.id ?? null, error: null }).where(eq(emailDigestRuns.id, run.id));
       outcome = { ...outcome, status: "sent", message: `${selected.length} vacatures verzonden` };
     }

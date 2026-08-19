@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sendPipelineFailureAlert } from "./email-pipeline-failure";
+import { sendPipelineFailureAlert, sendWeeklyDigestFailureAlert } from "./email-pipeline-failure";
 
 const successfulSteps = {
   MIGRATION_STATUS: "success",
@@ -86,5 +86,15 @@ describe("daily pipeline failure alert", () => {
     await expect(sendPipelineFailureAlert(environment({ MIGRATION_STATUS: "failure", RESEND_API_KEY: "", ALERT_EMAIL: "" }), fetchMock))
       .rejects.toThrow("Pipeline-alert kon niet worden verstuurd: ontbrekende configuratie: RESEND_API_KEY, ALERT_EMAIL");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("weekly digest failure alert", () => {
+  it("sends an idempotent alert regardless of ENABLE_EMAIL", async () => {
+    const fetchMock = resendSuccess();
+    await expect(sendWeeklyDigestFailureAlert(environment({ ENABLE_EMAIL: "false" }), fetchMock)).resolves.toBe("sent");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sentMessage(fetchMock).headers["Idempotency-Key"]).toBe("vacaturegpt-weekly-failure-12345");
+    expect(sentMessage(fetchMock).body.subject).toContain("wekelijkse vacaturemail mislukt");
   });
 });
