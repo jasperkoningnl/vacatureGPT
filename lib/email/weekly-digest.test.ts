@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildWeeklyDigest, deliveryAction, digestBoundary, selectWeeklyVacancies, weeklyRunKey, type DigestVacancy } from "./weekly-digest";
+import { buildWeeklyDigest, deliveryAction, digestBoundary, selectTestWeeklyVacancies, selectWeeklyVacancies, testEmailIdempotencyKey, weeklyRunKey, type DigestVacancy } from "./weekly-digest";
 
 const now = new Date("2026-08-11T07:00:00Z");
 function vacancy(overrides: Partial<DigestVacancy> = {}): DigestVacancy {
@@ -7,6 +7,11 @@ function vacancy(overrides: Partial<DigestVacancy> = {}): DigestVacancy {
 }
 
 describe("weekly candidate selection", () => {
+  it("applies the weekly content filters to test mail without applying digest history", () => {
+    const rows = [vacancy(), vacancy({ id: 2, active: false }), vacancy({ id: 3, feedbackValue: "not_suitable" }), vacancy({ id: 4, verdict: "not_suitable", score: 20 })];
+    expect(selectTestWeeklyVacancies(rows).map(({ id }) => id)).toEqual([1]);
+    expect(selectTestWeeklyVacancies([vacancy({ firstSeenAt: new Date(0) })])).toHaveLength(1);
+  });
   it("limits the first digest to vacancies first seen in the previous seven days", () => {
     const boundary = digestBoundary(now, null);
     expect(selectWeeklyVacancies([vacancy(), vacancy({ id: 2, firstSeenAt: new Date("2026-08-04T06:59:59Z") })], boundary, new Set()).map((item) => item.id)).toEqual([1]);
@@ -69,5 +74,11 @@ describe("weekly email content", () => {
   it("uses a stable ISO week retry key", () => {
     expect(weeklyRunKey(now)).toBe("2026-W33");
     expect(weeklyRunKey(new Date("2026-08-12T23:00:00Z"))).toBe("2026-W33");
+  });
+
+  it("uses a unique test key based on the GitHub run instead of the production week", () => {
+    expect(testEmailIdempotencyKey("123456789")).toBe("vacaturegpt-weekly-test-123456789");
+    expect(testEmailIdempotencyKey("123456790")).not.toBe(testEmailIdempotencyKey("123456789"));
+    expect(() => testEmailIdempotencyKey("2026-W33")).toThrow();
   });
 });
