@@ -24,16 +24,6 @@ export function selectWeeklyVacancies(input: DigestVacancy[], firstDigestBoundar
     .slice(0, limit);
 }
 
-/** Select a test payload with the digest's content filters, but without digest history. */
-export function selectTestWeeklyVacancies(input: DigestVacancy[], limit = WEEKLY_DIGEST_LIMIT) {
-  return selectWeeklyVacancies(input, null, new Set(), limit);
-}
-
-export function testEmailIdempotencyKey(githubRunId: string) {
-  if (!/^\d+$/.test(githubRunId)) throw new Error("GITHUB_RUN_ID ontbreekt of is ongeldig");
-  return `vacaturegpt-weekly-test-${githubRunId}`;
-}
-
 function escapeHtml(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
