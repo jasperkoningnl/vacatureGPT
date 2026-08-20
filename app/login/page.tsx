@@ -1,1 +1,19 @@
-import { login } from "../actions"; export default async function Login({searchParams}:{searchParams:Promise<{error?:string}>}){const q=await searchParams;return <div className="panel" style={{maxWidth:380,margin:"80px auto"}}><h1>Privétoegang</h1><p className="muted">Voer het applicatiewachtwoord in.</p>{q.error&&<p className="warn">Onjuist wachtwoord.</p>}<form action={login} className="form"><input type="password" name="password" required autoFocus/><button>Inloggen</button></form></div>}
+import type { Metadata } from "next";
+import { login } from "../actions";
+
+export const metadata: Metadata = { title: "Inloggen" };
+
+export default async function Login({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const q = await searchParams;
+  return <section className="panel login-panel">
+    <p className="eyebrow">Persoonlijke omgeving</p>
+    <h1>Privétoegang</h1>
+    <p className="muted">Voer het applicatiewachtwoord in.</p>
+    {q.error && <p className="form-error" role="alert">Onjuist wachtwoord. Probeer het opnieuw.</p>}
+    <form action={login} className="form">
+      <label htmlFor="password">Wachtwoord</label>
+      <input id="password" type="password" name="password" required autoFocus autoComplete="current-password"/>
+      <button>Inloggen</button>
+    </form>
+  </section>;
+}

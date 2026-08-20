@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { getCalibrationBatch, getCalibrationBatchByIds } from "@/lib/calibration-data";
 import CalibrationFlow from "./calibration-flow";
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Beoordelen" };
 const parseBatch = (value: string | undefined) => {
   if (!value) return null;
   const ids = value.split(",").map(Number);
