@@ -7,6 +7,7 @@ import * as schema from "./schema";
 import { aiAssessments, feedback, sourceRuns, sources, vacancies, vacancyOccurrences } from "./schema";
 import { type Database, queryVacancyList, setSourceEnabled } from "./application-queries";
 import { storeFeedback, storeFeedbackReason } from "./feedback";
+import { latestFeedbackPerVacancy } from "./latest-feedback";
 import { REASON_REQUIRED_MESSAGE } from "../feedback-validation";
 import { createDatabaseRunnerStore, runIngestSource } from "../ingestion/ingest-runner";
 
@@ -75,15 +76,18 @@ describe("database- en actionlaag", () => {
     expect(invalid.filters).toMatchObject({ feedback: undefined, ai: undefined, source: undefined });
   });
 
-  it("slaat feedback via de gebruikte upsert op en werkt dezelfde vacature bij", async () => {
+  it("bewaart feedback append-only en exposeert het nieuwste oordeel", async () => {
     const item = await vacancy("feedback");
 
     await storeFeedback(db, { vacancyId: item.id, value: "maybe", note: "Eerst" });
     await storeFeedback(db, { vacancyId: item.id, value: "interesting", note: "Daarna" });
 
     const rows = await db.select().from(feedback).where(eq(feedback.vacancyId, item.id));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ value: "interesting", note: "Daarna", learningEligible: true });
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ value: "maybe", note: "Eerst" });
+    const latest = latestFeedbackPerVacancy(db);
+    const [current] = await db.select().from(latest).where(eq(latest.vacancyId, item.id));
+    expect(current).toMatchObject({ value: "interesting", note: "Daarna", learningEligible: true });
   });
 
   async function assess(vacancyId: number, verdict: "interesting" | "maybe" | "not_suitable") {
@@ -152,6 +156,18 @@ describe("database- en actionlaag", () => {
     await assess(item.id, "maybe");
 
     expect(await storeFeedback(db, { vacancyId: item.id, value: "maybe" })).toMatchObject({ learningEligible: true });
+  });
+
+
+  it("zoekt in vacaturetekst en gebruikt alleen het nieuwste oordeel in de lijst", async () => {
+    const listSource = await source("search");
+    const item = await vacancy("zoekbaar", { title: "Redacteur", description: "Digitale cultuur en erfgoed" });
+    await db.insert(vacancyOccurrences).values({ vacancyId: item.id, sourceId: listSource.id, sourceUrl: "https://search.example/zoekbaar", rawData: {} });
+    await storeFeedback(db, { vacancyId: item.id, value: "not_suitable" });
+    await storeFeedback(db, { vacancyId: item.id, value: "interesting" });
+    const result = await queryVacancyList(db, { query: "erfgoed" });
+    expect(result.total).toBe(1);
+    expect(result.items[0]).toMatchObject({ id: item.id, feedback: "interesting" });
   });
 
   it("bewaart enabled en slaat ingest daadwerkelijk over voor een uitgeschakelde bron", async () => {

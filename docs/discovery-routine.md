@@ -114,9 +114,16 @@ expliciet in plaats van het te verbergen.
 
 ## De importer
 
-`scripts/ingest-discovery.ts` leest de feed via de GitHub Contents API vanaf `main`.
-`DISCOVERY_FEED_PATH` in `lib/ingestion/discovery-feed.ts` bepaalt welk bestand dat
-is; `fetchDiscoveryFeed` accepteert daarnaast een `feedPath`-argument. De standaard
-is `data/discovery/chatgpt/latest.json`, en de importrun gebruikt die standaard. De
-Claude-feed wordt dus nog niet geïmporteerd zolang de importer niet ook op
-`data/discovery/claude/latest.json` wordt losgelaten.
+`scripts/ingest-discovery.ts` leest zowel `data/discovery/chatgpt/latest.json` als
+`data/discovery/claude/latest.json` rechtstreeks uit de uitgecheckte repository. Iedere feed
+houdt zijn eigen bron en deduplicatiehistorie; de gedeelde ingest-runner bewaart alle
+vindplaatsen en slaat een uitgeschakelde bron veilig over.
+
+## Relatie met beheerbare voorkeuren
+
+De discovery-routines hebben hun eigen, extern beheerde zoekopdracht. De app bewaart het
+kandidaatprofiel en gevolgde werkgevers in PostgreSQL en gebruikt die bij AI-assessment;
+een wijziging daarvan past de externe discovery-opdracht niet automatisch aan. Houd een
+bewuste wijziging van het zoekbereik daarom ook in de routineconfiguratie bij en verzin geen
+ontbrekende waarden. De importer leest beide `latest.json`-feeds uit de uitgecheckte
+repository, verrijkt veilige directe links en verwerkt ze via dezelfde cloudpipeline.

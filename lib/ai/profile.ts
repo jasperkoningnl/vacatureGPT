@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
 
-export const CANDIDATE_CONTEXT = "Experienced senior editorial/media professional. Best-fitting work combines content/editorial responsibility with autonomy, quality, strategy + execution, project/program ownership, coaching/team leadership or meaningful digital/AI innovation. Communication roles can fit when they contain substantial content ownership or editorial thinking. AI/digital work is especially relevant when connected to editorial/content work. Junior roles, pure production/admin, sales, performance marketing and roles that are essentially only spokesperson work are poor fits.";
-
 export type AssessmentProfile = {
   candidateContext: string;
   preferences: {
@@ -19,13 +17,13 @@ export type AssessmentProfile = {
   watchedEmployers: string[];
 };
 
-type PreferenceRow = AssessmentProfile["preferences"];
+type PreferenceRow = AssessmentProfile["preferences"] & { candidateContext?: string };
 
-export function buildAssessmentProfile(preference: PreferenceRow, employers: string[], candidateContext = CANDIDATE_CONTEXT): AssessmentProfile {
+export function buildAssessmentProfile(preference: PreferenceRow, employers: string[], candidateContext = preference.candidateContext ?? ""): AssessmentProfile {
   return {
     candidateContext,
     preferences: {
-      ...preference,
+      hoursMin: preference.hoursMin, hoursMax: preference.hoursMax, salaryMin: preference.salaryMin, travelOrigin: preference.travelOrigin, maxTravelMinutes: preference.maxTravelMinutes,
       primaryCities: [...preference.primaryCities], secondaryCities: [...preference.secondaryCities],
       roleFamilies: [...preference.roleFamilies], positiveIndicators: [...preference.positiveIndicators], negativeIndicators: [...preference.negativeIndicators],
     },

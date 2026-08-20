@@ -2,7 +2,8 @@ import Link from "next/link";
 import { and, count, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { verdictLabels } from "@/lib/calibration";
 import { getDb } from "@/lib/db";
-import { aiAssessments, feedback, vacancies, vacancyTracking } from "@/lib/db/schema";
+import { latestFeedbackPerVacancy } from "@/lib/db/latest-feedback";
+import { aiAssessments, vacancies, vacancyTracking } from "@/lib/db/schema";
 import { CALIBRATION_BATCH_SIZE, funnelTerms } from "@/lib/funnel-terms";
 import { promisingAiVerdicts, rejectedVerdict } from "@/lib/vacancy-funnel";
 import { applicationStatusLabels, type ApplicationStatus } from "@/lib/vacancy-tracking";
@@ -20,6 +21,7 @@ function VacancyCards({ vacancies: rows, empty, showOwnVerdict = false, showTrac
 
 export default async function Home() {
   const db = getDb();
+  const feedback = latestFeedbackPerVacancy(db);
   // De dagelijkse funnel laat expliciet afgewezen vacatures weg. "Geen eigen oordeel" impliceert dat al;
   // de voorwaarde staat er expliciet bij zodat de regel zichtbaar in de query staat en niet stilzwijgend
   // uit een andere filter volgt. Het opgeslagen oordeel zelf verandert nergens.

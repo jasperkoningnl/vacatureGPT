@@ -50,3 +50,30 @@ Deduplicatie gebruikt bronidentiteit vóór conservatief titel + werkgever + loc
 ## Productie
 
 Zet `DATABASE_URL`, `APP_PASSWORD` en `SESSION_SECRET` in Vercel. Productie faalt gesloten als de wachtwoordvariabelen ontbreken. De sessie is een server-side ondertekende, `httpOnly`, `secure` cookie. Neon Auth wordt niet gebruikt. Voer migraties bewust uit tijdens deployment of vooraf met `pnpm db:migrate`.
+
+## Beheer en automatisering
+
+Op `/voorkeuren` zijn zowel de losse basisvoorkeuren als het inhoudelijke kandidaatprofiel
+en de gevolgde werkgevers te beheren. Een wijziging aan profiel of werkgevers verandert de
+profielhash; de volgende AI-assessment ziet daardoor vanzelf dat herbeoordeling nodig is.
+Feedback wordt als historie bewaard. Lijst, funnel, kalibratie en weekmail gebruiken steeds
+het nieuwste event per vacature; alleen events met `learningEligible=true` tellen mee voor
+leren.
+
+`/vacatures` ondersteunt vrije tekstzoek op titel, werkgever en vacaturetekst, combineert
+dubbele vindplaatsen tot één vacature en pagineert de unieke resultaten. Filters en pagina
+blijven via de URL deelbaar.
+
+Onder `/bronnen` kunnen beheerders vaste GitHub Actions-workflows starten: de dagelijkse
+pipeline, een gratis preview of betaalde AI-herbeoordeling, cleanup en de bestaande weekmail.
+De app voert die taken niet zelf uit. Configureer in Vercel uitsluitend server-side:
+
+- `GITHUB_ACTIONS_TOKEN`: fine-grained personal access token met **Actions: Read and write**
+  voor uitsluitend deze repository;
+- `GITHUB_REPOSITORY`: repository in de vorm `eigenaar/repository`;
+- `GITHUB_WORKFLOW_REF`: bestaande branch of tag, normaal `main`.
+
+De tokenhouder heeft toegang tot de repository nodig. Er is geen nieuw account of externe
+zoekdienst nodig. Workflowruns gebruiken bestaande GitHub Actions-minuten; AI-assessment
+kan bestaande OpenAI-kosten veroorzaken en vraagt daarom in de UI expliciete bevestiging.
+Voer productiemigraties nooit handmatig uit: de cloud-workflows draaien `pnpm db:migrate`.
