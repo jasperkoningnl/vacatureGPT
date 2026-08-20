@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { vacancies, vacancyOccurrences } from "../lib/db/schema";
@@ -6,7 +6,6 @@ import { DISCOVERY_SOURCES, planDiscoveryImport, readDiscoverySource, type Disco
 import { normalizeDiscoveryUrl, type DiscoveryVacancy } from "../lib/ingestion/discovery-feed";
 import { enrichDiscoveryVacancy } from "../lib/ingestion/discovery-enrichment";
 import { runIngestSource } from "../lib/ingestion/ingest-runner";
-import { recomputeVacancyActivity } from "../lib/vacancy-lifecycle";
 
 const repository = process.env.GITHUB_REPOSITORY || "jasperkoningnl/vacatureGPT";
 const db = getDb();
@@ -20,11 +19,15 @@ function values(item: DiscoveryVacancy) {
 
 for (const config of DISCOVERY_SOURCES) {
   const baseUrl = `https://github.com/${repository}/blob/main/${config.path}`;
-  const execution = await runIngestSource({ slug: config.slug, name: config.name, baseUrl }, async ({ source, run }) => {
+  const execution = await runIngestSource({ slug: config.slug, name: config.name, baseUrl }, async ({ source, run, activity }) => {
     // Read only this feed after the central enabled check has admitted the source.
     const selected = await readDiscoverySource(config);
-    const existingVacancies = await db.select({ id: vacancies.id, employer: vacancies.employer, title: vacancies.title }).from(vacancies);
-    const existingOccurrences = await db.select({ id: vacancyOccurrences.id, vacancyId: vacancyOccurrences.vacancyId, sourceId: vacancyOccurrences.sourceId, sourceUrl: vacancyOccurrences.sourceUrl, rawData: vacancyOccurrences.rawData }).from(vacancyOccurrences);
+    const vacancyMatches = selected.vacancies.map((item) => { const [employer, title] = item.companyTitleKey.split("|"); return and(sql`lower(regexp_replace(trim(${vacancies.employer}), '\s+', ' ', 'g')) = ${employer}`, sql`lower(regexp_replace(trim(${vacancies.title}), '\s+', ' ', 'g')) = ${title}`); });
+    const candidateUrls = [...new Set(selected.vacancies.flatMap((item) => [item.normalizedDirectUrl, item.normalizedSourceUrl]).filter((url): url is string => Boolean(url)))];
+    const escaped = (value: string) => value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+    const occurrenceMatches = candidateUrls.flatMap((url) => { const parsed = new URL(url); const marker = escaped(`//${parsed.host}${parsed.pathname}`); return [ilike(vacancyOccurrences.sourceUrl, `%${marker}%`), sql`${vacancyOccurrences.rawData}::text ilike ${`%${marker}%`}`]; });
+    const existingVacancies = vacancyMatches.length ? await db.select({ id: vacancies.id, employer: vacancies.employer, title: vacancies.title }).from(vacancies).where(or(...vacancyMatches)) : [];
+    const existingOccurrences = occurrenceMatches.length ? await db.select({ id: vacancyOccurrences.id, vacancyId: vacancyOccurrences.vacancyId, sourceId: vacancyOccurrences.sourceId, sourceUrl: vacancyOccurrences.sourceUrl, rawData: vacancyOccurrences.rawData }).from(vacancyOccurrences).where(or(...occurrenceMatches)) : [];
     const plan = planDiscoveryImport([selected], existingVacancies, existingOccurrences);
     const createdVacancies = new Map<string, number>(); const counts = { imported: 0, duplicates: 0 }; const depth = { enriched: 0, metadataOnly: 0 };
     for (const planned of plan) {
@@ -38,7 +41,7 @@ for (const config of DISCOVERY_SOURCES) {
       const occurrence = existingOccurrences.find((row) => row.sourceId === source.id && normalizeDiscoveryUrl(row.sourceUrl) === normalizeDiscoveryUrl(item.sourceUrl));
       if (occurrence) await db.update(vacancyOccurrences).set({ vacancyId, sourceRunId: run.id, lastSeenAt: new Date(), active: true, rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
       else await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, sourceUrl: item.sourceUrl, rawData: item.rawData, active: true }).onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, lastSeenAt: new Date(), active: true, rawData: item.rawData } });
-      await recomputeVacancyActivity([vacancyId]);
+      activity.touch(vacancyId);
     }
     completed.push({ result: selected, counts, skipped: false });
     const errors = [...selected.errors, ...(selected.fatalError ? [selected.fatalError] : [])];

@@ -20,6 +20,12 @@ export type RunnerStore = {
   appendSummary(text: string): Promise<void>;
 };
 
+export type VacancyActivityBatch = { touch(vacancyId: number): void; flush(): Promise<number> };
+export function createVacancyActivityBatch(recompute: (ids: number[]) => Promise<number> = recomputeVacancyActivity): VacancyActivityBatch {
+  const vacancyIds = new Set<number>();
+  return { touch(id) { vacancyIds.add(id); }, async flush() { const ids = [...vacancyIds]; vacancyIds.clear(); return recompute(ids); } };
+}
+
 export function createDatabaseRunnerStore(db: Database): RunnerStore { return {
   async ensureSource(definition) {
     const [source] = await db.insert(sources).values(definition)
@@ -41,7 +47,7 @@ function summary(definition: SourceDefinition, status: string, result?: IngestRe
     "| Result | Count |", "| --- | ---: |", ...rows.map(([label, count]) => `| ${label} | ${count} |`), "", warningsMarkdown(result?.warnings ?? []), ""].join("\n");
 }
 
-export async function runIngestSource(definition: SourceDefinition, ingest: (context: { source: Source; run: Run }) => Promise<IngestResult>, store: RunnerStore = createDatabaseRunnerStore(getDb())) {
+export async function runIngestSource(definition: SourceDefinition, ingest: (context: { source: Source; run: Run; activity: VacancyActivityBatch }) => Promise<IngestResult>, store: RunnerStore = createDatabaseRunnerStore(getDb())) {
   const source = await store.ensureSource(definition);
   const run = await store.createRun(source.id);
   if (!source.enabled) {
@@ -50,8 +56,10 @@ export async function runIngestSource(definition: SourceDefinition, ingest: (con
     console.log(`${definition.name} summary: status=skipped (bron uitgeschakeld)`);
     return { status: "skipped" as const, source, run };
   }
+  const activity = createVacancyActivityBatch();
   try {
-    const result = await ingest({ source, run });
+    const result = await ingest({ source, run, activity });
+    await activity.flush();
     const warnings = result.warnings ?? [];
     const status = result.status ?? (warnings.length ? "warning" : "success");
     if (result.trustworthy !== false && status !== "error") await store.reconcile(source.id, run.id);
@@ -61,6 +69,7 @@ export async function runIngestSource(definition: SourceDefinition, ingest: (con
     warnings.forEach((warning) => console.warn(`${definition.name} warning: ${warning}`));
     return { status, source, run, result };
   } catch (error) {
+    await activity.flush();
     const message = error instanceof Error ? error.message : "Onbekende fout";
     await store.finishRun(run.id, { status: "error", finishedAt: new Date(), error: message });
     await store.appendSummary(summary(definition, "error", { resultCount: 0, newCount: 0, changedCount: 0, error: message }));
@@ -69,7 +78,7 @@ export async function runIngestSource(definition: SourceDefinition, ingest: (con
 }
 
 export type IngestVacancy = { canonicalKey: string; contentHash: string; externalId?: string | null; sourceUrl: string; rawData: unknown };
-export async function upsertIngestVacancy<T extends IngestVacancy>(context: { sourceId: number; runId: number; item: T; values: typeof vacancies.$inferInsert; active?: boolean; refreshUnchanged?: boolean; mergeCanonical?: (existing: typeof vacancies.$inferSelect, incoming: typeof vacancies.$inferInsert) => Partial<typeof vacancies.$inferInsert> }) {
+export async function upsertIngestVacancy<T extends IngestVacancy>(context: { sourceId: number; runId: number; item: T; values: typeof vacancies.$inferInsert; active?: boolean; refreshUnchanged?: boolean; activity?: VacancyActivityBatch; mergeCanonical?: (existing: typeof vacancies.$inferSelect, incoming: typeof vacancies.$inferInsert) => Partial<typeof vacancies.$inferInsert> }) {
   const db = getDb(); const { sourceId, runId, item } = context;
   const [byExternal] = item.externalId ? await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences }).from(vacancyOccurrences).innerJoin(vacancies, eq(vacancyOccurrences.vacancyId, vacancies.id)).where(and(eq(vacancyOccurrences.sourceId, sourceId), eq(vacancyOccurrences.externalId, item.externalId))).limit(1) : [];
   const [byUrl] = byExternal ? [] : await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences }).from(vacancyOccurrences).innerJoin(vacancies, eq(vacancyOccurrences.vacancyId, vacancies.id)).where(and(eq(vacancyOccurrences.sourceId, sourceId), eq(vacancyOccurrences.sourceUrl, item.sourceUrl))).limit(1);
@@ -80,5 +89,5 @@ export async function upsertIngestVacancy<T extends IngestVacancy>(context: { so
   const occurrence = byExternal?.occurrence ?? byUrl?.occurrence; const active = context.active ?? true;
   if (occurrence) await db.update(vacancyOccurrences).set({ active, sourceRunId: runId, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
   else await db.insert(vacancyOccurrences).values({ active, vacancyId, sourceId, sourceRunId: runId, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData }).onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active, vacancyId, sourceRunId: runId, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
-  await recomputeVacancyActivity([vacancyId]); return { vacancyId, outcome, duplicate };
+  if (context.activity) context.activity.touch(vacancyId); else await recomputeVacancyActivity([vacancyId]); return { vacancyId, outcome, duplicate };
 }

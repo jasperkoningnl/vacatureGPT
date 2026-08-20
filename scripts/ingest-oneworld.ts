@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../lib/db";
 import { vacancies, vacancyOccurrences } from "../lib/db/schema";
-import { expireKnownGoneUrls, recomputeVacancyActivity } from "../lib/vacancy-lifecycle";
+import { expireKnownGoneUrls } from "../lib/vacancy-lifecycle";
 import { fetchOneWorld, fetchOneWorldUrls, matchRepairOccurrence, repairFailureReason, type NormalizedVacancy } from "../lib/ingestion/oneworld-parser";
 import { createIngestionWarning, runStatusForWarnings } from "../lib/ingestion/shared/ingestion-warnings";
 import { runIngestSource, upsertIngestVacancy } from "../lib/ingestion/ingest-runner";
@@ -31,7 +31,7 @@ function vacancyValues(item: NormalizedVacancy) {
   };
 }
 
-await runIngestSource({ slug: "oneworld", name: "OneWorld", baseUrl: "https://www.oneworld.nl" }, async ({ source, run }) => {
+await runIngestSource({ slug: "oneworld", name: "OneWorld", baseUrl: "https://www.oneworld.nl" }, async ({ source, run, activity }) => {
   const repairOccurrences = isRepair ? await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences })
     .from(vacancyOccurrences).innerJoin(vacancies, eq(vacancyOccurrences.vacancyId, vacancies.id))
     .where(eq(vacancyOccurrences.sourceId, source.id)) : [];
@@ -62,10 +62,10 @@ await runIngestSource({ slug: "oneworld", name: "OneWorld", baseUrl: "https://ww
       else unchanged++;
       await db.update(vacancies).set({ ...vacancyValues(item), lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(vacancies.id, existing.vacancy.id));
       await db.update(vacancyOccurrences).set({ active: true, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, matched.id));
-      await recomputeVacancyActivity([existing.vacancy.id]);
+      activity.touch(existing.vacancy.id);
       continue;
     }
-    const result = await upsertIngestVacancy({ sourceId: source.id, runId: run.id, item, values: vacancyValues(item), refreshUnchanged: true });
+    const result = await upsertIngestVacancy({ sourceId: source.id, runId: run.id, activity, item, values: vacancyValues(item), refreshUnchanged: true });
     if (result.outcome === "added") added++; else if (result.outcome === "updated") changed++; else unchanged++;
     if (result.duplicate) duplicates++;
   }

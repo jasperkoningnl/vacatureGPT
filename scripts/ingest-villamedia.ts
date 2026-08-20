@@ -9,7 +9,7 @@ function values(item: VillamediaVacancy) {
     salaryOriginal: item.salaryOriginal, deadline: item.deadline, description: item.originalText, originalText: item.originalText, contentHash: item.contentHash, active: !item.isStage };
 }
 
-await runIngestSource({ slug: "villamedia", name: "Villamedia", baseUrl: VILLAMEDIA_BASE_URL }, async ({ source, run }) => {
+await runIngestSource({ slug: "villamedia", name: "Villamedia", baseUrl: VILLAMEDIA_BASE_URL }, async ({ source, run, activity }) => {
   const fetched = await fetchVillamedia();
   await expireKnownGoneUrls(source.id, fetched.goneUrls);
   const warnings = [...fetched.warnings, ...fetched.results.flatMap((item) => item.warnings.map((warning) => createIngestionWarning({ ...parseIngestionWarning(warning), url: item.sourceUrl })))];
@@ -17,7 +17,7 @@ await runIngestSource({ slug: "villamedia", name: "Villamedia", baseUrl: VILLAME
   if (failure) throw new Error(`${failure} Geen vacaturewrites uitgevoerd.`);
   let added = 0; let updated = 0; let unchanged = 0; let duplicates = 0;
   for (const item of fetched.results) {
-    const result = await upsertIngestVacancy({ sourceId: source.id, runId: run.id, item, values: values(item), active: activeForDiscoveredOccurrence(item), refreshUnchanged: true });
+    const result = await upsertIngestVacancy({ sourceId: source.id, runId: run.id, activity, item, values: values(item), active: activeForDiscoveredOccurrence(item), refreshUnchanged: true });
     if (result.outcome === "added") added++; else if (result.outcome === "updated") updated++; else unchanged++;
     if (result.duplicate) duplicates++;
   }

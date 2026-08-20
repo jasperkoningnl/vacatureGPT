@@ -68,10 +68,10 @@ describe("daily pipeline failure alert", () => {
     expect(sentMessage(fetchMock).body.text).toContain("GitHub discovery (failure)");
   });
 
-  it("alerts when one discovery feed has errors without failing the importer", async () => {
+  it("does not alert for malformed individual discovery postings", async () => {
     const fetchMock = resendSuccess();
-    await sendPipelineFailureAlert(environment({ DISCOVERY_STATUS: "success", DISCOVERY_ERRORS: "1" }), fetchMock);
-    expect(sentMessage(fetchMock).body.text).toContain("GitHub discovery (warning)");
+    await expect(sendPipelineFailureAlert(environment({ DISCOVERY_STATUS: "success", DISCOVERY_ERRORS: "1" }), fetchMock)).resolves.toBe("not-needed");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("combines multiple failures into one mail", async () => {

@@ -1,4 +1,5 @@
 import { scoreToVerdict, type Verdict } from "../ai/vacancy-assessment";
+import { formatDate } from "../date-format";
 
 export const WEEKLY_DIGEST_LIMIT = 15;
 export type DigestVacancy = {
@@ -43,7 +44,7 @@ function salary(vacancy: DigestVacancy) {
 
 function deadline(vacancy: DigestVacancy) {
   if (!vacancy.deadline) return null;
-  return `Deadline ${new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", day: "numeric", month: "long", year: "numeric" }).format(vacancy.deadline)}`;
+  return `Deadline ${formatDate(vacancy.deadline)}`;
 }
 
 export function normalizeBaseUrl(value: string) {
