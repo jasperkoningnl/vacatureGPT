@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { METADATA_ONLY_ASSESSMENT_NOTICE, METADATA_ONLY_BADGE, METADATA_ONLY_TEXT_NOTICE, isMetadataOnly } from "@/lib/vacancy-depth";
 import { VacancyContent } from "./vacancy-content";
+import { formatDate } from "@/lib/date-format";
 
 export type VacancyDetailData = {
   id: number; title: string; employer: string; active?: boolean;
@@ -48,7 +49,7 @@ export function VacancyReviewDetail({ vacancy, review, assessment, concealAssess
         <div><dt>Locatie</dt><dd>{vacancy.location || "Niet vermeld"}</dd></div>
         <div><dt>Uren</dt><dd>{vacancy.hoursMin ? `${vacancy.hoursMin}–${vacancy.hoursMax ?? vacancy.hoursMin} uur` : vacancy.hoursOriginal || "Niet vermeld"}</dd></div>
         <div><dt>Salaris</dt><dd>{salaryText(vacancy)}</dd></div>
-        <div><dt>Deadline</dt><dd>{vacancy.deadline ? new Date(vacancy.deadline).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" }) : "Niet vermeld"}</dd></div>
+        <div><dt>Deadline</dt><dd>{vacancy.deadline ? formatDate(vacancy.deadline) : "Niet vermeld"}</dd></div>
       </dl>{sourceName && <p className="source-name muted">Bron: {sourceName}</p>}
     </section>
     <section className="detail-section ai-assessment panel" aria-labelledby="ai-title">

@@ -9,7 +9,7 @@ function values(item: CultureleVacancy) {
     salaryOriginal: item.salaryOriginal, deadline: item.deadline, description: item.originalText, originalText: item.originalText, contentHash: item.contentHash, active: true };
 }
 
-await runIngestSource({ slug: "culturele-vacatures", name: "Culturele Vacatures", baseUrl: CULTURELE_BASE_URL }, async ({ source, run }) => {
+await runIngestSource({ slug: "culturele-vacatures", name: "Culturele Vacatures", baseUrl: CULTURELE_BASE_URL }, async ({ source, run, activity }) => {
   const fetched = await fetchCulturele();
   await expireKnownGoneUrls(source.id, fetched.goneUrls);
   const warnings = [...fetched.warnings, ...fetched.results.flatMap((item) => item.warnings.map((warning) => createIngestionWarning({ ...parseIngestionWarning(warning), url: item.sourceUrl })))];
@@ -17,7 +17,7 @@ await runIngestSource({ slug: "culturele-vacatures", name: "Culturele Vacatures"
   if (failure) throw new Error(`${failure} Geen vacaturewrites uitgevoerd.`);
   let added = 0; let updated = 0; let unchanged = 0; let deduplicated = 0;
   for (const item of fetched.results) {
-    const result = await upsertIngestVacancy({ sourceId: source.id, runId: run.id, item, values: values(item), mergeCanonical: (existing, incoming) => mergeReliable(existing, incoming) });
+    const result = await upsertIngestVacancy({ sourceId: source.id, runId: run.id, activity, item, values: values(item), mergeCanonical: (existing, incoming) => mergeReliable(existing, incoming) });
     if (result.outcome === "added") added++; else if (result.outcome === "updated") updated++; else unchanged++;
     if (result.duplicate) deduplicated++;
   }

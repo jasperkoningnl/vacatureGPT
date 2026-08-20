@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runIngestSource, type IngestResult, type RunnerStore, type SourceDefinition } from "./ingest-runner";
+import { createVacancyActivityBatch, runIngestSource, type IngestResult, type RunnerStore, type SourceDefinition } from "./ingest-runner";
 import type { sourceRuns, sources } from "../db/schema";
 
 const definition: SourceDefinition = { slug: "test", name: "Testbron", baseUrl: "https://example.com" };
@@ -19,6 +19,13 @@ function fixture(enabled: boolean) {
 const normalResult: IngestResult = { resultCount: 3, newCount: 1, changedCount: 1, unchanged: 1, duplicates: 1, trustworthy: true };
 
 describe("shared ingest runner", () => {
+  it("batches and deduplicates vacancy activity recomputation", async () => {
+    const recompute = vi.fn().mockResolvedValue(2); const activity = createVacancyActivityBatch(recompute);
+    activity.touch(8); activity.touch(9); activity.touch(8);
+    await expect(activity.flush()).resolves.toBe(2);
+    expect(recompute).toHaveBeenCalledWith([8, 9]);
+  });
+
   it("skips a disabled source without executing ingest and records a clean skipped run", async () => {
     const { store } = fixture(false); const ingest = vi.fn();
     const result = await runIngestSource(definition, ingest, store);
