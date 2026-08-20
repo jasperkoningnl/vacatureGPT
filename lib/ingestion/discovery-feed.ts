@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
-export const DISCOVERY_FEED_PATH = "data/vacaturegpt_discovery_latest.json";
-export const DISCOVERY_BRANCH = "discovery-data";
+export const DISCOVERY_FEED_PATH = "data/discovery/chatgpt/latest.json";
 
 export type DiscoveryPosting = {
   company: string;
@@ -136,15 +136,17 @@ export function parseDiscoveryFeed(input: string): { runDate: string; postingsFo
   return { runDate, postingsFound: postings.length, vacancies, errors };
 }
 
-export function githubDiscoveryFeedUrl(repository: string) {
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error("Ongeldige GitHub repositorynaam.");
-  return `https://api.github.com/repos/${repository}/contents/${DISCOVERY_FEED_PATH}?ref=${DISCOVERY_BRANCH}`;
-}
-
-export async function fetchDiscoveryFeed(repository: string, token: string, fetcher: typeof fetch = fetch) {
-  const response = await fetcher(githubDiscoveryFeedUrl(repository), { headers: { Accept: "application/vnd.github.raw+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28" } });
-  if (!response.ok) throw new Error(`Discovery-feed kon niet uit branch ${DISCOVERY_BRANCH} worden gelezen: GitHub HTTP ${response.status}`);
-  return parseDiscoveryFeed(await response.text());
+export async function readDiscoveryFeed(
+  feedPath = DISCOVERY_FEED_PATH,
+  reader: (path: string, encoding: "utf8") => Promise<string> = readFile,
+) {
+  let input: string;
+  try {
+    input = await reader(feedPath, "utf8");
+  } catch (error) {
+    throw new Error(`Discovery-feed kon niet uit de checkout worden gelezen (${feedPath}): ${error instanceof Error ? error.message : "onbekende fout"}`);
+  }
+  return parseDiscoveryFeed(input);
 }
 
 export function isDiscoveryDuplicate(item: DiscoveryVacancy, knownUrls: ReadonlySet<string>, knownCompanyTitles: ReadonlySet<string>) {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { selectAssessmentCandidates } from "../ai/assessment-run";
-import { discoveryUrlsInRawData, fetchDiscoveryFeed, isDiscoveryDuplicate, normalizeDiscoveryUrl, parseDiscoveryFeed } from "./discovery-feed";
+import { DISCOVERY_FEED_PATH, discoveryUrlsInRawData, isDiscoveryDuplicate, normalizeDiscoveryUrl, parseDiscoveryFeed, readDiscoveryFeed } from "./discovery-feed";
 
 const posting = {
   company: "Voorbeeld Organisatie", title: "Communicatieadviseur", location: "Utrecht", remote_policy: "Hybride",
@@ -11,10 +11,11 @@ const posting = {
 const json = (overrides: Record<string, unknown> = {}) => JSON.stringify({ run_date: "2026-08-19", postings: [{ ...posting, ...overrides }] });
 
 describe("GitHub discovery feed", () => {
-  it("reads and normalizes the feed through the GitHub branch API", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(json(), { status: 200 }));
-    const result = await fetchDiscoveryFeed("jasperkoningnl/vacatureGPT", "token", fetcher);
-    expect(fetcher.mock.calls[0][0]).toBe("https://api.github.com/repos/jasperkoningnl/vacatureGPT/contents/data/vacaturegpt_discovery_latest.json?ref=discovery-data");
+  it("reads and normalizes the ChatGPT feed from the main checkout", async () => {
+    const reader = vi.fn().mockResolvedValue(json());
+    const result = await readDiscoveryFeed(undefined, reader);
+    expect(DISCOVERY_FEED_PATH).toBe("data/discovery/chatgpt/latest.json");
+    expect(reader).toHaveBeenCalledWith("data/discovery/chatgpt/latest.json", "utf8");
     expect(result.postingsFound).toBe(1);
     expect(result.vacancies[0]).toMatchObject({ employer: "Voorbeeld Organisatie", hoursMin: 32, hoursMax: 36, salaryMin: 4000, salaryMax: 5500 });
   });
@@ -51,6 +52,11 @@ describe("GitHub discovery feed", () => {
   it("fails malformed JSON and malformed feed shapes in a controlled way", () => {
     expect(() => parseDiscoveryFeed("{broken")).toThrow("malformed JSON");
     expect(() => parseDiscoveryFeed(JSON.stringify({ run_date: "2026-08-19" }))).toThrow("postings-array");
+  });
+
+  it("fails a missing checkout file in a controlled way", async () => {
+    const reader = vi.fn().mockRejectedValue(new Error("ENOENT"));
+    await expect(readDiscoveryFeed(undefined, reader)).rejects.toThrow("kon niet uit de checkout worden gelezen");
   });
 
   it("makes a newly imported active vacancy a normal AI-assessment candidate", () => {

@@ -2,16 +2,15 @@ import { eq } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
-import { companyTitleKey, discoveryUrlsInRawData, fetchDiscoveryFeed, isDiscoveryDuplicate, normalizeDiscoveryUrl, type DiscoveryVacancy } from "../lib/ingestion/discovery-feed";
+import { companyTitleKey, discoveryUrlsInRawData, readDiscoveryFeed, isDiscoveryDuplicate, normalizeDiscoveryUrl, type DiscoveryVacancy } from "../lib/ingestion/discovery-feed";
 import { recomputeVacancyActivity, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
 
 const repository = process.env.GITHUB_REPOSITORY || "jasperkoningnl/vacatureGPT";
-const token = process.env.GITHUB_TOKEN;
-if (!token) throw new Error("GITHUB_TOKEN ontbreekt; de discovery-feed kan niet worden gelezen.");
 
 const db = getDb();
-const [source] = await db.insert(sources).values({ slug: "github-discovery", name: "GitHub discovery feed", baseUrl: `https://github.com/${repository}/tree/discovery-data`, enabled: true })
-  .onConflictDoUpdate({ target: sources.slug, set: { name: "GitHub discovery feed", baseUrl: `https://github.com/${repository}/tree/discovery-data`, enabled: true } }).returning();
+const feedUrl = `https://github.com/${repository}/blob/main/data/discovery/chatgpt/latest.json`;
+const [source] = await db.insert(sources).values({ slug: "github-discovery", name: "GitHub discovery feed", baseUrl: feedUrl, enabled: true })
+  .onConflictDoUpdate({ target: sources.slug, set: { name: "GitHub discovery feed", baseUrl: feedUrl, enabled: true } }).returning();
 const [run] = await db.insert(sourceRuns).values({ sourceId: source.id }).returning();
 
 async function writeSummary(found: number, imported: number, duplicates: number, errors: string[]) {
@@ -33,7 +32,7 @@ function values(item: DiscoveryVacancy) {
 
 let found = 0; let imported = 0; let duplicates = 0; let errors: string[] = [];
 try {
-  const feed = await fetchDiscoveryFeed(repository, token);
+  const feed = await readDiscoveryFeed();
   found = feed.postingsFound; errors = feed.errors;
   const existingVacancies = await db.select({ id: vacancies.id, employer: vacancies.employer, title: vacancies.title }).from(vacancies);
   const existingOccurrences = await db.select({ id: vacancyOccurrences.id, vacancyId: vacancyOccurrences.vacancyId, sourceId: vacancyOccurrences.sourceId, sourceUrl: vacancyOccurrences.sourceUrl, rawData: vacancyOccurrences.rawData }).from(vacancyOccurrences);

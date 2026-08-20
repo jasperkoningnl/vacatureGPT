@@ -66,8 +66,6 @@ jobs:
       - name: Import GitHub discovery feed
         id: discovery
         continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: pnpm ingest:discovery
 
       - name: Clean up stale vacancy occurrences
