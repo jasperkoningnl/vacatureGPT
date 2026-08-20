@@ -5,6 +5,7 @@ import { feedbackLabels } from "@/lib/feedback-validation";
 import { funnelTerms } from "@/lib/funnel-terms";
 import { METADATA_ONLY_BADGE } from "@/lib/vacancy-depth";
 import { showsRejected, type RawSearchParams } from "@/lib/vacancy-list";
+import { formatDate } from "@/lib/date-format";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Raw
     <td><div className="judgements"><span className="ai-badge">AI: {r.aiScore === null || r.aiVerdict === null ? "Nog geen oordeel" : `${r.aiScore} · ${feedbackLabels[r.aiVerdict]}`}</span><span className="user-badge">Jouw oordeel: {r.feedback?feedbackLabels[r.feedback]:"Nog geen oordeel"}</span>{r.metadataOnly && <span className="depth-badge" title="Alleen metadata bekend; geen volledige vacaturetekst.">{METADATA_ONLY_BADGE}</span>}</div></td>
     <td>{r.location ?? "Niet vermeld"}</td><td>{r.hoursMin ? `${r.hoursMin}${r.hoursMax ? `–${r.hoursMax}` : ""} uur` : "Uren onbekend"}</td>
     <td>{r.salaryMin ? `€ ${r.salaryMin.toLocaleString("nl-NL")}${r.salaryMax ? `–${r.salaryMax.toLocaleString("nl-NL")}` : ""}` : (r.salaryOriginal ? "Niet gekwantificeerd" : "Niet vermeld")}</td>
-    <td>{r.deadline?.toLocaleDateString("nl-NL") ?? "Niet vermeld"}</td>
+    <td>{r.deadline ? formatDate(r.deadline) : "Niet vermeld"}</td>
     <td><div className="source-links">{r.occurrences.map((occurrence) => <a key={`${occurrence.source}-${occurrence.url}`} href={occurrence.url} target="_blank" rel="noreferrer">{occurrence.source} ↗</a>)}</div></td>
   </tr>)}</tbody></table></div>{!items.length && <p className="muted">Geen vacatures binnen deze filters.</p>}</>;
 }

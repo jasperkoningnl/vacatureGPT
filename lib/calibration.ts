@@ -48,8 +48,3 @@ export function calibrationSummary(results: { userVerdict: Verdict; aiVerdict: V
   for (const result of results) breakdown[result.userVerdict]++;
   return { total: results.length, agreed, differed: results.length - agreed, agreementPercentage: results.length ? Math.round(agreed / results.length * 100) : 0, breakdown };
 }
-
-export function compactExcerpt(vacancy: Pick<BlindVacancy, "description" | "originalText">, max = 520) {
-  const text = (vacancy.description || vacancy.originalText).replace(/\s+/g, " ").trim();
-  return text.length <= max ? text : `${text.slice(0, max).replace(/\s+\S*$/, "")}…`;
-}

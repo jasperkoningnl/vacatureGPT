@@ -1,7 +1,7 @@
 import "./globals.css";
 import { SiteNav } from "./components/site-nav";
 
-export const metadata = { title: "VacatureGPT", description: "Persoonlijke vacaturezoeker" };
+export const metadata = { title: "VacatureGPT", description: "Persoonlijke vacaturezoeker", robots: { index: false, follow: false } };
 export const viewport = { themeColor: "#205c43" };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
