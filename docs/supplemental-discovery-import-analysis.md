@@ -74,15 +74,14 @@ Relevante officiële documentatie:
    met de API-key. Accepteer alleen JSON, begrens de responsomvang en valideer het
    schema voordat databasewrites starten.
 
-Een alternatief zonder Google-credential is de producent de nieuwste Claude-output
-automatisch naar een tweede bestand in de bestaande `discovery-data`-branch te laten
-publiceren. Dat is technisch nog eenvoudiger en laat beide provenance-labels intact,
-maar verandert het afgesproken aanleverproces en vereist dus een productbesluit.
+De ChatGPT/Codex-feed staat inmiddels afzonderlijk op `main` in
+`data/discovery/chatgpt/latest.json`. De Claude-aanlevering blijft een aparte feed;
+deze analyse verandert haar opslag of provenance niet.
 
 ## Ontwerp voor implementatie nadat de blokkade is opgelost
 
-- Lees de GitHub-feed via de GitHub Contents API met de bestaande Actions
-  `GITHUB_TOKEN`, expliciet met `ref=discovery-data`; schrijf nooit naar die branch.
+- Lees de ChatGPT/Codex-feed rechtstreeks uit de checkout van `main`, via
+  `data/discovery/chatgpt/latest.json`; hiervoor is geen GitHub API-aanroep of token nodig.
 - Haal beide feeds onafhankelijk op met een `Promise.allSettled`-achtig patroon,
   zodat één bronfout de andere bron niet verhindert. Markeer de totale supplemental
   stap wel als mislukt wanneer een echte bron- of importfout optreedt, zodat het

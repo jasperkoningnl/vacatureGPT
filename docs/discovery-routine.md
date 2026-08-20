@@ -1,6 +1,6 @@
 # Discovery-routine: geplande vacaturezoekopdracht
 
-Een geplande Claude-routine zoekt elke werkdag naar nieuwe vacatures en publiceert
+Een geplande ChatGPT/Codex-routine zoekt elke werkdag naar nieuwe vacatures en publiceert
 het resultaat als JSON in de repository. De routine is de producent van de
 supplemental discovery-feed die in
 [`supplemental-discovery-import-analysis.md`](./supplemental-discovery-import-analysis.md)
@@ -24,10 +24,14 @@ MCP-tools hebben.
 
 ## Uitvoer
 
-Alle uitvoer staat op de databranch `discovery-data`, nooit op `main`.
+De routine werkt vanuit `main` en mag per dagelijkse run uitsluitend deze twee bestanden wijzigen:
 
-- `data/discovery/latest.json` — uitsluitend de nieuwe vacatures van de laatste run.
-- `data/discovery/seen.json` — alle eerder gevonden vacatures, voor deduplicatie.
+- `data/discovery/chatgpt/latest.json` — uitsluitend de nieuwe vacatures van de laatste run.
+- `data/discovery/chatgpt/seen.json` — alle eerder gevonden vacatures, voor deduplicatie.
+
+De feed gebruikt geen blijvende databranch. Applicatiecode, configuratie, documentatie
+en andere databestanden blijven tijdens een discovery-run ongewijzigd. De afzonderlijke
+Claude-feed en haar bestanden vallen buiten deze routine.
 
 ```json
 {"run_date":"YYYY-MM-DD","postings":[{"company":"","title":"","location":"","remote_policy":"hybrid/remote/on-site/unknown","hours":"","salary":"","posted_date":"","source":"linkedin/indeed/other","source_url":"","direct_url":"of null","first_seen":"YYYY-MM-DD"}]}
@@ -53,5 +57,5 @@ junior- en administratieve functies, sales, woordvoerderschap en technisch
 projectmanagement vallen af.
 
 De volledige opdracht staat in de routine zelf en is te bekijken en te wijzigen
-via de routines-weergave op claude.ai. Deze pagina beschrijft alleen wat de
+via de configuratie van de ChatGPT/Codex-routine. Deze pagina beschrijft alleen wat de
 routine oplevert, zodat de importer daarop kan bouwen.
