@@ -1,18 +1,20 @@
-import { asc, desc, eq, ilike, inArray, isNotNull, isNull, sql, SQL } from "drizzle-orm";
+import { asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql, SQL } from "drizzle-orm";
 import { z } from "zod";
 import { aiAssessments, feedback, sources, vacancies } from "./db/schema";
-import { promisingAiVerdicts, type VacancyVerdict } from "./vacancy-funnel";
+import { promisingAiVerdicts, rejectedVerdict, type VacancyVerdict } from "./vacancy-funnel";
 
 export const verdictFilterValues = ["interesting", "maybe", "not_suitable"] as const satisfies readonly VacancyVerdict[];
 export const feedbackFilterValues = ["unreviewed", ...verdictFilterValues] as const;
 export const aiFilterValues = ["unassessed", "promising", ...verdictFilterValues] as const;
 export const salaryFilterValues = ["known", "unknown"] as const;
 export const sortValues = ["newest", "deadline", "ai-score"] as const;
+export const rejectedFilterValues = ["show"] as const;
 
 export type FeedbackFilter = (typeof feedbackFilterValues)[number];
 export type AiFilter = (typeof aiFilterValues)[number];
 export type SalaryFilter = (typeof salaryFilterValues)[number];
 export type SortOption = (typeof sortValues)[number];
+export type RejectedFilter = (typeof rejectedFilterValues)[number];
 
 export type VacancyListFilters = {
   city?: string;
@@ -21,6 +23,8 @@ export type VacancyListFilters = {
   salary?: SalaryFilter;
   feedback?: FeedbackFilter;
   ai?: AiFilter;
+  /** Alleen een expliciete keuze haalt afgewezen vacatures terug in beeld. */
+  rejected?: RejectedFilter;
   sort: SortOption;
 };
 
@@ -43,10 +47,11 @@ const searchParamsSchema = z.object({
   salary: optionalEnum(salaryFilterValues),
   feedback: optionalEnum(feedbackFilterValues),
   ai: optionalEnum(aiFilterValues),
+  rejected: optionalEnum(rejectedFilterValues),
   sort: text.pipe(z.enum(sortValues).catch("newest")),
 });
 
-const emptyFilters: VacancyListFilters = { city: undefined, employer: undefined, source: undefined, salary: undefined, feedback: undefined, ai: undefined, sort: "newest" };
+const emptyFilters: VacancyListFilters = { city: undefined, employer: undefined, source: undefined, salary: undefined, feedback: undefined, ai: undefined, rejected: undefined, sort: "newest" };
 
 /** Faalt nooit: elke onbruikbare queryparameter levert "geen filter" op in plaats van een fout. */
 export function parseVacancyListFilters(params: RawSearchParams): VacancyListFilters {
@@ -59,6 +64,14 @@ export function resolveSourceFilter(slug: string | undefined, knownSlugs: readon
   return slug && knownSlugs.includes(slug) ? slug : undefined;
 }
 
+/**
+ * Afgewezen vacatures zijn standaard weggelegd. Ze komen alleen terug als je de schakelaar
+ * aanzet of als je er expliciet op filtert — dan vraag je er immers zelf om.
+ */
+export function showsRejected(filters: Pick<VacancyListFilters, "rejected" | "feedback">) {
+  return filters.rejected === "show" || filters.feedback === rejectedVerdict;
+}
+
 export function buildVacancyListConditions(filters: VacancyListFilters): SQL[] {
   const conditions: SQL[] = [eq(vacancies.active, true)];
   if (filters.city) conditions.push(ilike(vacancies.location, `%${filters.city}%`));
@@ -68,6 +81,7 @@ export function buildVacancyListConditions(filters: VacancyListFilters): SQL[] {
   if (filters.salary === "unknown") conditions.push(isNull(vacancies.salaryMin));
   if (filters.feedback === "unreviewed") conditions.push(isNull(feedback.id));
   else if (filters.feedback) conditions.push(eq(feedback.value, filters.feedback));
+  if (!showsRejected(filters)) conditions.push(or(isNull(feedback.value), ne(feedback.value, rejectedVerdict))!);
   if (filters.ai === "unassessed") conditions.push(isNull(aiAssessments.id));
   else if (filters.ai === "promising") conditions.push(inArray(aiAssessments.verdict, promisingAiVerdicts));
   else if (filters.ai) conditions.push(eq(aiAssessments.verdict, filters.ai));

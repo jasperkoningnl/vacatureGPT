@@ -16,3 +16,49 @@
 .source-links{display:grid;gap:5px;min-width:130px}
 
 .depth-notice{background:#f3ede1;border-left:4px solid #9a6a27;color:#5f512f;padding:12px 15px;margin:0 0 20px;max-width:72ch}.depth-notice strong{color:#4a3f24}.depth-badge{display:inline-block;width:max-content;padding:4px 7px;font-size:12px;border-radius:2px;background:#f3ede1;color:#7a6427}
+
+/* Navigatie volgt de funnel; beheer staat er visueel los van. Actieve pagina is zichtbaar én aankondigbaar. */
+.skip-link{position:absolute;left:-9999px;top:0;z-index:10;background:var(--accent);color:#fff;padding:11px 17px;font-weight:700;text-decoration:none}.skip-link:focus{left:0}
+main:focus{outline:none}
+.site-nav .brand{margin-right:26px}
+.site-nav .nav-group{display:flex;align-items:center;gap:18px}.site-nav .nav-funnel{margin-right:auto;gap:20px}
+.site-nav .nav-manage{padding-left:20px;border-left:1px solid var(--line);gap:14px}
+.nav-group-label{color:var(--muted);font-size:11px;font-weight:750;letter-spacing:.11em;text-transform:uppercase}
+nav a.nav-active{color:var(--ink);font-weight:700;box-shadow:inset 0 -2px 0 var(--accent)}
+nav a.nav-primary.nav-active{color:#fff!important;background:var(--accent-dark);box-shadow:none}
+@media(max-width:800px){.site-nav .nav-manage{padding-left:14px;gap:12px}.site-nav .nav-funnel{gap:14px}.nav-group-label{display:none}}
+
+/* Filters met echte labels in plaats van alleen placeholders. */
+.filters .filter-field{display:grid;gap:4px;color:var(--muted);font-size:12px;font-weight:700}
+.filters .filter-field>span{letter-spacing:.04em;text-transform:uppercase}
+.filters .filter-field input,.filters .filter-field select{color:var(--ink);font-weight:400}
+.filter-toggle{display:flex;align-items:center;gap:8px;align-self:end;padding-bottom:9px;font-size:13px;color:var(--ink)}
+.filter-toggle input{width:16px;height:16px}
+.list-note{margin:-10px 0 20px;font-size:13px}
+
+/* Titelkolom blijft leesbaar nu die semantisch een rijkop is. */
+.vacancy-table tbody th{text-align:left;padding:16px 14px;border-bottom:1px solid var(--line);vertical-align:top;font-size:inherit;text-transform:none;letter-spacing:normal;color:inherit;font-weight:400;min-width:230px}
+.vacancy-table thead th{text-align:left;padding:16px 14px;border-bottom:1px solid var(--line)}
+
+/* De drie funnelbegrippen staan naast elkaar en leggen zichzelf uit. */
+.funnel-metrics{grid-template-columns:repeat(3,1fr)}
+.metrics .metric-note{color:var(--muted);font-size:12px;line-height:1.45;margin:8px 24px 0 0;max-width:34ch}
+@media(max-width:800px){.funnel-metrics{grid-template-columns:1fr}.metrics div{padding:18px 0}}
+
+/* Verplichte reden en toelichting worden overal op dezelfde manier aangekondigd. */
+.required-hint{color:var(--accent);font-size:11px;font-weight:750;letter-spacing:.06em;text-transform:uppercase}
+.feedback-hint{color:var(--muted);font-size:13px;margin:0 0 4px}
+
+/* Meldingen op voorkeuren: informatie is geen waarschuwing. Eigen klassen, zodat de
+   bestaande .notice-stijlen op /bronnen ongemoeid blijven. */
+.pref-notice{padding:12px 15px;margin:0 0 18px;max-width:72ch;border-left:4px solid var(--line)}
+.pref-notice-info{background:#eef1ef;border-left-color:var(--accent);color:var(--ink)}
+.pref-notice-warning{background:#f3ede1;border-left-color:#9a6a27;color:#5f512f}
+
+/* Laadstatus en foutpagina's. */
+.route-loading{padding:50px 0;max-width:750px}
+.skeleton-list{display:grid;gap:12px;margin-top:26px}
+.skeleton-list span{display:block;height:58px;background:linear-gradient(90deg,#eceeec,#f5f6f4,#eceeec);border:1px solid var(--line)}
+.card-cta{color:var(--accent);font-size:13px;font-weight:700}
+.shortlist-card{align-items:start}.shortlist-card .card-cta{grid-column:1/-1;margin-top:4px}
+table tbody th{text-align:left;padding:16px 14px;border-bottom:1px solid var(--line);vertical-align:top;font-size:inherit;text-transform:none;letter-spacing:normal;color:inherit;font-weight:400}

@@ -1,6 +1,9 @@
-export const verdictLabels = { interesting: "Interessant", maybe: "Misschien", not_suitable: "Niet passend" } as const;
-export type Verdict = keyof typeof verdictLabels;
-export type ReasonCode = "role" | "seniority" | "location" | "hours" | "salary" | "employer" | "other";
+import { feedbackLabels, type FeedbackDecision, type ReasonCode } from "./feedback-validation";
+
+/** Kalibratie en detailpagina delen één set oordelen en redenen; deze aliassen houden de bestaande namen intact. */
+export const verdictLabels = feedbackLabels;
+export type Verdict = FeedbackDecision;
+export type { ReasonCode };
 
 export type CalibrationCandidate = {
   id: number; title: string; employer: string; location: string | null;

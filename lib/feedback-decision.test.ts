@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { eligibleFeedbackValues, feedbackDecisions, isFeedbackDecision, NO_DECISION_MESSAGE } from "./feedback-learning";
+import {
+  INVALID_REASON_MESSAGE, NOTE_REQUIRED_MESSAGE, NO_DECISION_MESSAGE, REASON_REQUIRED_MESSAGE,
+  assertFeedbackIsComplete, feedbackDecisions, feedbackValidationMessage, isFeedbackDecision,
+  reasonCodes, reasonIsRequired, validateFeedback,
+} from "./feedback-validation";
 
 describe("a non-decision is never an opinion", () => {
   it("recognises only the three explicit verdicts", () => {
@@ -10,9 +14,50 @@ describe("a non-decision is never an opinion", () => {
   });
 
   it("refuses to build learning-eligible values without an explicit verdict", () => {
-    expect(() => eligibleFeedbackValues({ vacancyId: 1, value: undefined as never }, "maybe")).toThrow(NO_DECISION_MESSAGE);
-    expect(() => eligibleFeedbackValues({ vacancyId: 1, value: "" as never }, null)).toThrow(NO_DECISION_MESSAGE);
-    expect(eligibleFeedbackValues({ vacancyId: 1, value: "maybe" }, "interesting")).toMatchObject({ learningEligible: true, value: "maybe" });
+    expect(() => validateFeedback({ value: undefined, aiVerdict: "maybe" })).toThrow(NO_DECISION_MESSAGE);
+    expect(() => validateFeedback({ value: "", aiVerdict: null })).toThrow(NO_DECISION_MESSAGE);
+    expect(validateFeedback({ value: "maybe", aiVerdict: "maybe" })).toMatchObject({ learningEligible: true, value: "maybe" });
+  });
+});
+
+describe("één feedbackcontract voor detailpagina en kalibratieflow", () => {
+  it("vraagt alleen een reden wanneer het eigen oordeel van het AI-oordeel afwijkt", () => {
+    expect(reasonIsRequired("interesting", "not_suitable")).toBe(true);
+    expect(reasonIsRequired("interesting", "interesting")).toBe(false);
+    expect(reasonIsRequired("interesting", null)).toBe(false);
+  });
+
+  it("markeert een afwijking zonder reden wel als oordeel, maar niet als leersignaal", () => {
+    const validated = validateFeedback({ value: "interesting", aiVerdict: "not_suitable" });
+    expect(validated).toMatchObject({ reasonRequired: true, reasonCode: null, learningEligible: false });
+    expect(() => assertFeedbackIsComplete(validated)).toThrow(REASON_REQUIRED_MESSAGE);
+  });
+
+  it("maakt dezelfde afwijking mét reden wel leersignaal", () => {
+    const validated = validateFeedback({ value: "interesting", aiVerdict: "not_suitable", reasonCode: "role" });
+    expect(validated).toMatchObject({ reasonCode: "role", learningEligible: true });
+    expect(assertFeedbackIsComplete(validated)).toBe(validated);
+  });
+
+  it("eist overal een toelichting bij 'Iets anders'", () => {
+    expect(() => validateFeedback({ value: "maybe", aiVerdict: "interesting", reasonCode: "other" })).toThrow(NOTE_REQUIRED_MESSAGE);
+    expect(() => validateFeedback({ value: "maybe", aiVerdict: "interesting", reasonCode: "other", note: "   " })).toThrow(NOTE_REQUIRED_MESSAGE);
+    expect(validateFeedback({ value: "maybe", aiVerdict: "interesting", reasonCode: "other", note: " te ver weg " })).toMatchObject({ note: "te ver weg", learningEligible: true });
+  });
+
+  it("weigert een verzonnen reden en kent alleen de gedeelde lijst", () => {
+    expect(reasonCodes).toEqual(["role", "seniority", "location", "hours", "salary", "employer", "other"]);
+    expect(() => validateFeedback({ value: "maybe", aiVerdict: "maybe", reasonCode: "verzonnen" })).toThrow(INVALID_REASON_MESSAGE);
+  });
+
+  it("laat een lege reden een echte lege waarde zijn in plaats van een lege string", () => {
+    expect(validateFeedback({ value: "maybe", aiVerdict: "maybe", reasonCode: "", note: "" })).toMatchObject({ reasonCode: null, note: null, learningEligible: true });
+  });
+
+  it("geeft contractfouten als bruikbare uitleg door en houdt andere fouten generiek", () => {
+    expect(feedbackValidationMessage(new Error(REASON_REQUIRED_MESSAGE))).toBe(REASON_REQUIRED_MESSAGE);
+    expect(feedbackValidationMessage(new Error("connection reset"))).toBeNull();
+    expect(feedbackValidationMessage("kapot")).toBeNull();
   });
 });
 
@@ -26,8 +71,10 @@ describe("the detail form never preselects a verdict", () => {
     expect(form).not.toMatch(/defaultChecked/);
   });
 
-  it("keeps Opslaan disabled until a verdict is chosen", () => {
-    expect(form).toContain("<SubmitButton disabled={!choice}/>");
+  it("keeps Opslaan disabled until the submission satisfies the shared contract", () => {
+    expect(form).toContain("const needsReason = reasonIsRequired(choice, aiVerdict);");
+    expect(form).toContain("const blocked = !choice || (needsReason && !reasonCode) || (needsNote && !note.trim());");
+    expect(form).toContain("<SubmitButton disabled={blocked}/>");
     expect(form).toContain("disabled={pending || disabled}");
   });
 
@@ -51,7 +98,20 @@ describe("the server refuses to store a decision that was not taken", () => {
 
   it("routes both flows through the single eligibility boundary", () => {
     expect(actions.match(/storeFeedback\(/g)?.length).toBe(2);
-    expect(readFileSync("lib/db/feedback.ts", "utf8")).toContain("eligibleFeedbackValues");
+    const store = readFileSync("lib/db/feedback.ts", "utf8");
+    expect(store).toContain("validateFeedback");
+    expect(store).toContain("assertFeedbackIsComplete");
+    expect(store).toContain("feedbackColumns");
+  });
+
+  it("laat de kalibratiereden dezelfde validatie doorlopen in plaats van learningEligible hard te zetten", () => {
+    expect(actions).toContain("storeFeedbackReason(getDb(),x)");
+    expect(actions).not.toContain("learningEligible");
+    expect(actions).toContain("z.enum(reasonCodes)");
+  });
+
+  it("geeft de contractfout terug aan de gebruiker in plaats van een generieke melding", () => {
+    expect(actions).toContain("const message=feedbackValidationMessage(error);if(message)return{status:\"error\",message}");
   });
 });
 
@@ -64,8 +124,17 @@ describe("detail page and calibration flow follow the same rules", () => {
     expect(calibration).not.toMatch(/defaultChecked|checked=\{value/);
   });
 
-  it("shares one list of verdicts between both routes", () => {
+  it("shares one list of verdicts and reasons between both routes", () => {
     expect(calibration).toContain('from "@/app/components/feedback-form"');
-    expect(readFileSync("app/components/feedback-form.tsx", "utf8")).toContain('from "@/lib/feedback-learning"');
+    expect(calibration).toContain('from "@/lib/feedback-validation"');
+    expect(calibration).toContain("reasonCodes.map");
+    expect(calibration).toContain("reasonLabels[value]");
+    expect(readFileSync("app/components/feedback-form.tsx", "utf8")).toContain('from "@/lib/feedback-validation"');
+  });
+
+  it("gebruikt dezelfde meldingen bij een ontbrekende reden of toelichting", () => {
+    expect(calibration).toContain("setError(REASON_REQUIRED_MESSAGE)");
+    expect(calibration).toContain('reason === "other" && !note.trim()');
+    expect(calibration).toContain("setError(NOTE_REQUIRED_MESSAGE)");
   });
 });
