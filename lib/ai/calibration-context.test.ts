@@ -3,7 +3,7 @@ import { buildCalibrationContext, MAX_CALIBRATION_EXAMPLES, type CalibrationFeed
 
 const row = (id: number, overrides: Partial<CalibrationFeedback> = {}): CalibrationFeedback => ({
   id, learningEligible: true, aiVerdict: "interesting", userVerdict: "not_suitable",
-  reasonCode: "role", note: null, vacancyTitle: `Vacature ${id}`, employer: "Werkgever",
+  reasonCode: "role", note: null, vacancyTitle: `Vacature ${id}`, employer: "Werkgever", contentDepth: "full",
   updatedAt: new Date(`2026-08-${String(id).padStart(2, "0")}T12:00:00Z`), ...overrides,
 });
 

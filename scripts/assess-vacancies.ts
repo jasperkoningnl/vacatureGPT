@@ -7,6 +7,7 @@ import { assessVacancy, ASSESSMENT_CONFIG } from "../lib/ai/vacancy-assessment";
 import { buildAssessmentProfile, hashProfile } from "../lib/ai/profile";
 import { buildCalibrationContext } from "../lib/ai/calibration-context";
 import { parseAssessmentMode, selectAssessmentCandidates } from "../lib/ai/assessment-run";
+import { vacancyContentDepth } from "../lib/vacancy-depth";
 
 const mode = parseAssessmentMode(process.argv.slice(2));
 const db = getDb();
@@ -27,13 +28,14 @@ const profileHash = hashProfile(profile);
 const calibrationRows = await db.select({
   id: feedback.id, learningEligible: feedback.learningEligible, aiVerdict: feedback.aiVerdict,
   userVerdict: feedback.value, reasonCode: feedback.reasonCode, note: feedback.note,
-  vacancyTitle: vacancies.title, employer: vacancies.employer, updatedAt: feedback.updatedAt,
+  vacancyTitle: vacancies.title, employer: vacancies.employer, updatedAt: feedback.updatedAt, originalText: vacancies.originalText,
 }).from(feedback).innerJoin(vacancies, eq(vacancies.id, feedback.vacancyId)).where(eq(feedback.learningEligible, true));
-const calibrationContext = buildCalibrationContext(calibrationRows);
+// Een oordeel op een metadata-only vacature is geen volwaardig kalibratievoorbeeld; de diepte wordt live bepaald.
+const calibrationContext = buildCalibrationContext(calibrationRows.map((row) => ({ ...row, contentDepth: vacancyContentDepth(row) })));
 const existing = activeVacancies.length ? await db.select().from(aiAssessments).where(inArray(aiAssessments.vacancyId, activeVacancies.map(({ id }) => id))) : [];
 const existingByVacancy = new Map(existing.map((assessment) => [assessment.vacancyId, assessment]));
 const pending = selectAssessmentCandidates(activeVacancies, existing, profileHash, mode);
-const stats = { active: activeVacancies.length, skipped: activeVacancies.length - pending.length, newlyAssessed: 0, reassessed: 0, failed: 0, inputTokens: 0, outputTokens: 0, verdicts: { interesting: 0, maybe: 0, not_suitable: 0 } };
+const stats = { active: activeVacancies.length, skipped: activeVacancies.length - pending.length, newlyAssessed: 0, reassessed: 0, failed: 0, metadataOnly: 0, inputTokens: 0, outputTokens: 0, verdicts: { interesting: 0, maybe: 0, not_suitable: 0 } };
 const client = new OpenAI();
 
 async function processVacancy(vacancy: (typeof activeVacancies)[number]) {
@@ -57,9 +59,10 @@ async function processVacancy(vacancy: (typeof activeVacancies)[number]) {
       assessedAt: now, updatedAt: now,
     } });
     if (existingByVacancy.has(vacancy.id)) stats.reassessed++; else stats.newlyAssessed++;
+    if (result.contentDepth === "metadata_only") stats.metadataOnly++;
     stats.inputTokens += result.inputTokens; stats.outputTokens += result.outputTokens;
     stats.verdicts[result.verdict]++;
-    console.log(`Beoordeeld: ${vacancy.id} — ${vacancy.title} (${result.score})`);
+    console.log(`Beoordeeld: ${vacancy.id} — ${vacancy.title} (${result.score}, ${result.contentDepth})`);
   } catch (error) {
     stats.failed++;
     console.error(`Mislukt: ${vacancy.id} — ${vacancy.title}`, error);
@@ -83,6 +86,7 @@ const summary = `## ${heading}
 | Nieuw beoordeeld | ${stats.newlyAssessed} |
 | Succesvol herbeoordeeld | ${stats.newlyAssessed + stats.reassessed} |
 | Mislukt | ${stats.failed} |
+| Beoordeeld op alleen metadata | ${stats.metadataOnly} |
 | Interessant | ${counts.interesting} |
 | Misschien | ${counts.maybe} |
 | Niet passend | ${counts.not_suitable} |

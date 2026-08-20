@@ -5,6 +5,7 @@ import { useRef, useState, useTransition } from "react";
 import { saveCalibrationReason, submitCalibrationChoice } from "@/app/actions";
 import { VacancyReviewDetail, type AssessmentData } from "@/app/components/vacancy-review-detail";
 import { feedbackChoices } from "@/app/components/feedback-form";
+import { isFeedbackDecision } from "@/lib/feedback-learning";
 import { calibrationSummary, verdictLabels, type BlindVacancy, type ReasonCode, type Verdict } from "@/lib/calibration";
 
 const reasons: [ReasonCode, string][] = [["role", "Functie / inhoud"], ["seniority", "Niveau / verantwoordelijkheid"], ["location", "Locatie / reistijd"], ["hours", "Uren"], ["salary", "Salaris"], ["employer", "Werkgever / sector"], ["other", "Iets anders"]];
@@ -16,8 +17,9 @@ export default function CalibrationFlow({ vacancies }: { vacancies: BlindVacancy
   const [reveal, setReveal] = useState<Reveal>();
   const [reason, setReason] = useState<ReasonCode>(); const [note, setNote] = useState(""); const [reasonSaved, setReasonSaved] = useState(false); const [error, setError] = useState("");
   const submitting = useRef(false); const [pending, start] = useTransition(); const vacancy = vacancies[index];
+  // Zelfde regel als op de detailpagina: er wordt pas opgeslagen na een expliciet gekozen oordeel.
   const choose = (value: Verdict) => {
-    if (submitting.current || reveal) return; submitting.current = true;
+    if (submitting.current || reveal || !isFeedbackDecision(value)) return; submitting.current = true;
     start(async () => { try { setError(""); setReveal(await submitCalibrationChoice({ vacancyId: vacancy.id, value })); } catch (e) { setError(e instanceof Error ? e.message : "Opslaan mislukt"); } finally { submitting.current = false; } });
   };
   const submitReason = () => {

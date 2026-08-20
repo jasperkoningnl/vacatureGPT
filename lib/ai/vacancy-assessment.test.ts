@@ -28,7 +28,7 @@ describe("structured assessment", () => {
     const profile = buildAssessmentProfile({ hoursMin: 32, hoursMax: 36, salaryMin: null, primaryCities: [], secondaryCities: [], travelOrigin: "Amersfoort", maxTravelMinutes: 30, roleFamilies: [], positiveIndicators: [], negativeIndicators: [] }, []);
     await assessVacancy({ parse } as never, { title: "Editor", employer: "A", location: null, hoursMin: null, hoursMax: null, salaryMin: null, salaryMax: null, salaryPeriod: null, deadline: null, description: "Redigeert artikelen", originalText: "Redigeert artikelen" }, profile);
     const instructions = parse.mock.calls[0][0].instructions;
-    expect(ASSESSMENT_CONFIG.promptVersion).toBe("vacancy-fit-v3");
+    expect(ASSESSMENT_CONFIG.promptVersion).toBe("vacancy-fit-v4");
     expect(instructions).toContain("clear Dutch");
     expect(instructions).toContain("1–2 short sentences");
     expect(instructions).toContain("concrete");

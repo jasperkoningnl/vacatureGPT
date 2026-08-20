@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { vacancyContentDepth, type VacancyContentDepth } from "../vacancy-depth";
 
 export const DISCOVERY_FEED_PATH = "data/discovery/chatgpt/latest.json";
 
@@ -35,9 +36,12 @@ export type DiscoveryVacancy = {
   salaryPeriod: "month" | "year" | "hour" | null;
   salaryOriginal: string | null;
   firstSeenAt: Date;
+  /** Alleen gevuld wanneer de echte vacaturetekst bij de werkgever is opgehaald. */
+  description: string | null;
   originalText: string;
+  contentDepth: VacancyContentDepth;
   contentHash: string;
-  rawData: { feedRunDate: string; posting: DiscoveryPosting; selectedUrl: string };
+  rawData: { feedRunDate: string; posting: DiscoveryPosting; selectedUrl: string; enrichment?: { fetchedFrom: string; textHash: string } };
 };
 
 const clean = (value: unknown) => typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -129,7 +133,8 @@ export function parseDiscoveryFeed(input: string): { runDate: string; postingsFo
       vacancies.push({ sourceUrl: selected, directUrl: clean(posting.direct_url) || null, normalizedDirectUrl: direct, normalizedSourceUrl: source,
         companyTitleKey: companyTitleKey(company, title), canonicalKey: createHash("sha256").update(companyTitleKey(company, title)).digest("hex"),
         title, employer: company, location: clean(posting.location) || null, hoursMin: hours.min, hoursMax: hours.max, hoursOriginal,
-        salaryMin: salary.min, salaryMax: salary.max, salaryPeriod: salary.period, salaryOriginal, firstSeenAt, originalText,
+        salaryMin: salary.min, salaryMax: salary.max, salaryPeriod: salary.period, salaryOriginal, firstSeenAt, description: null, originalText,
+        contentDepth: vacancyContentDepth({ originalText }),
         contentHash: createHash("sha256").update(JSON.stringify(rawData)).digest("hex"), rawData });
     } catch (error) { errors.push(`Posting ${index + 1}: ${error instanceof Error ? error.message : "onbekende fout"}`); }
   });

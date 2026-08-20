@@ -1,3 +1,5 @@
+import type { VacancyContentDepth } from "../vacancy-depth";
+
 export const MIN_ELIGIBLE_REVIEWS = 3;
 export const MAX_CALIBRATION_EXAMPLES = 3;
 
@@ -11,6 +13,8 @@ export type CalibrationFeedback = {
   note: string | null;
   vacancyTitle: string;
   employer: string;
+  /** Een oordeel op alleen metadata is geen volwaardig kalibratievoorbeeld en telt hier niet mee. */
+  contentDepth: VacancyContentDepth;
   updatedAt: Date;
 };
 
@@ -27,7 +31,7 @@ const validReasons = new Set(["role", "seniority", "location", "hours", "salary"
 
 /** Builds a bounded, deterministic summary. It never interprets notes into new preferences. */
 export function buildCalibrationContext(rows: CalibrationFeedback[]): CalibrationContext | null {
-  const eligible = rows.filter((row) => row.learningEligible && row.aiVerdict !== null);
+  const eligible = rows.filter((row) => row.learningEligible && row.aiVerdict !== null && row.contentDepth === "full");
   if (eligible.length < MIN_ELIGIBLE_REVIEWS) return null;
   const disagreements = eligible.filter((row) => row.aiVerdict !== row.userVerdict);
   const agreements = eligible.length - disagreements.length;

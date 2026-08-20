@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { ASSESSMENT_CONFIG } from "./vacancy-assessment";
 import { parseAssessmentMode, selectAssessmentCandidates } from "./assessment-run";
 import { buildCalibrationContext, type CalibrationFeedback } from "./calibration-context";
+import { MIN_FULL_VACANCY_TEXT } from "../vacancy-depth";
 
+const fullText = "V".repeat(MIN_FULL_VACANCY_TEXT);
 const vacancies = [
-  { id: 1, active: true, contentHash: "same" },
-  { id: 2, active: true, contentHash: "changed" },
-  { id: 3, active: false, contentHash: "same" },
+  { id: 1, active: true, contentHash: "same", originalText: fullText },
+  { id: 2, active: true, contentHash: "changed", originalText: fullText },
+  { id: 3, active: false, contentHash: "same", originalText: fullText },
 ];
 const current = (vacancyId: number) => ({ vacancyId, vacancyContentHash: "same", profileHash: "profile", promptVersion: ASSESSMENT_CONFIG.promptVersion, model: ASSESSMENT_CONFIG.model });
 
@@ -29,7 +31,7 @@ describe("assessment run modes", () => {
   });
 
   it("uses only learning-eligible feedback in the unchanged calibration builder", () => {
-    const base = { aiVerdict: "maybe", userVerdict: "interesting", reasonCode: "role", note: null, vacancyTitle: "Titel", employer: "Werkgever", updatedAt: new Date() } satisfies Omit<CalibrationFeedback, "id" | "learningEligible">;
+    const base = { aiVerdict: "maybe", userVerdict: "interesting", reasonCode: "role", note: null, vacancyTitle: "Titel", employer: "Werkgever", contentDepth: "full", updatedAt: new Date() } satisfies Omit<CalibrationFeedback, "id" | "learningEligible">;
     const context = buildCalibrationContext([
       { ...base, id: 1, learningEligible: true }, { ...base, id: 2, learningEligible: true },
       { ...base, id: 3, learningEligible: true }, { ...base, id: 4, learningEligible: false },

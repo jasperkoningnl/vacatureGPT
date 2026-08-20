@@ -61,7 +61,7 @@ describe("GitHub discovery feed", () => {
 
   it("makes a newly imported active vacancy a normal AI-assessment candidate", () => {
     const item = parseDiscoveryFeed(json()).vacancies[0];
-    const vacancy = { id: 42, active: true, contentHash: item.contentHash };
+    const vacancy = { id: 42, active: true, contentHash: item.contentHash, originalText: item.originalText };
     expect(selectAssessmentCandidates([vacancy], [], "profile-hash", "normal")).toEqual([vacancy]);
   });
 

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { aiAssessments, feedback, sources, vacancies, vacancyOccurrences } from "@/lib/db/schema";
+import { METADATA_ONLY_BADGE, MIN_FULL_VACANCY_TEXT } from "@/lib/vacancy-depth";
 import { buildVacancyListConditions, dedupeVacancyRows, parseVacancyListFilters, resolveSourceFilter, vacancyListOrdering, type RawSearchParams } from "@/lib/vacancy-list";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<Raw
     salaryMax: vacancies.salaryMax, salaryOriginal: vacancies.salaryOriginal, deadline: vacancies.deadline,
     url: vacancyOccurrences.sourceUrl, source: sources.name, feedback: feedback.value,
     aiScore: aiAssessments.score, aiVerdict: aiAssessments.verdict,
+    // Dezelfde diepteregel als lib/vacancy-depth, maar in SQL zodat de lijst geen volledige vacatureteksten hoeft op te halen.
+    metadataOnly: sql<boolean>`length(btrim(${vacancies.originalText})) < ${MIN_FULL_VACANCY_TEXT}`,
   }).from(vacancies)
     .innerJoin(vacancyOccurrences, and(eq(vacancies.id, vacancyOccurrences.vacancyId), eq(vacancyOccurrences.active, true)))
     .innerJoin(sources, eq(vacancyOccurrences.sourceId, sources.id))
@@ -35,7 +38,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Raw
     <select name="sort" defaultValue={q.sort}><option value="newest">Nieuwste</option><option value="deadline">Deadline</option><option value="ai-score">Beste match</option></select><button>Filter</button>
   </form><div className="table-wrap"><table className="vacancy-table"><thead><tr><th>Vacature</th><th>Beoordelingen</th><th>Locatie</th><th>Uren</th><th>Salaris</th><th>Deadline</th><th>Bronnen</th></tr></thead><tbody>{items.map((r) => <tr key={r.id}>
     <td><Link href={`/vacatures/${r.id}`}><b>{r.title}</b></Link><br/><span className="muted">{r.employer}</span></td>
-    <td><div className="judgements"><span className="ai-badge">AI: {r.aiScore === null || r.aiVerdict === null ? "Nog geen oordeel" : `${r.aiScore} · ${verdictLabels[r.aiVerdict]}`}</span><span className="user-badge">Jasper: {r.feedback?verdictLabels[r.feedback]:"Nog geen oordeel"}</span></div></td>
+    <td><div className="judgements"><span className="ai-badge">AI: {r.aiScore === null || r.aiVerdict === null ? "Nog geen oordeel" : `${r.aiScore} · ${verdictLabels[r.aiVerdict]}`}</span><span className="user-badge">Jasper: {r.feedback?verdictLabels[r.feedback]:"Nog geen oordeel"}</span>{r.metadataOnly && <span className="depth-badge" title="Alleen metadata bekend; geen volledige vacaturetekst.">{METADATA_ONLY_BADGE}</span>}</div></td>
     <td>{r.location ?? "Niet vermeld"}</td><td>{r.hoursMin ? `${r.hoursMin}${r.hoursMax ? `–${r.hoursMax}` : ""} uur` : "Uren onbekend"}</td>
     <td>{r.salaryMin ? `€ ${r.salaryMin.toLocaleString("nl-NL")}${r.salaryMax ? `–${r.salaryMax.toLocaleString("nl-NL")}` : ""}` : (r.salaryOriginal ? "Niet gekwantificeerd" : "Niet vermeld")}</td>
     <td>{r.deadline?.toLocaleDateString("nl-NL") ?? "Niet vermeld"}</td>
