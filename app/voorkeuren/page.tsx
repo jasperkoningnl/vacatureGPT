@@ -1,10 +1,12 @@
 import { desc } from "drizzle-orm";
+import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
 import { preferences, watchedEmployers } from "@/lib/db/schema";
 import { preferenceNotices } from "@/lib/preference-notices";
 import { addWatchedEmployer, savePreferences, toggleWatchedEmployer } from "../actions";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Voorkeuren" };
 
 export default async function Page() {
   const employers = await getDb().select().from(watchedEmployers).orderBy(watchedEmployers.name);

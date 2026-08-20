@@ -85,7 +85,7 @@ describe("toegankelijkheid van het raamwerk", () => {
   it("biedt een skip-link naar de hoofdinhoud", () => {
     expect(layout).toContain('<a className="skip-link" href="#hoofdinhoud">Naar de hoofdinhoud</a>');
     expect(layout).toContain('id="hoofdinhoud"');
-    expect(readFileSync("app/globals.css", "utf8")).toContain(".skip-link:focus{left:0}");
+    expect(readFileSync("app/globals.css", "utf8")).toMatch(/\.skip-link:focus\s*\{\s*left:\s*0/);
   });
 
   it("geeft de navigatie een semantische nav met een naam", () => {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
 import { queryVacancyList } from "@/lib/db/application-queries";
 import { feedbackLabels } from "@/lib/feedback-validation";
@@ -8,6 +9,7 @@ import { showsRejected, type RawSearchParams } from "@/lib/vacancy-list";
 import { formatDate } from "@/lib/date-format";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Alle vacatures" };
 
 export default async function Page({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const { sourceOptions, filters: q, items, total, pageCount, rejectedCount } = await queryVacancyList(getDb(), await searchParams);
