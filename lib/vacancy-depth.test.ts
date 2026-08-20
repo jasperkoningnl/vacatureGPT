@@ -84,6 +84,7 @@ describe("thin judgements stay out of the learning loop", () => {
 describe("limited reliability is visible in the interface", () => {
   const shared = readFileSync("app/components/vacancy-review-detail.tsx", "utf8");
   const list = readFileSync("app/vacatures/page.tsx", "utf8");
+  const listQuery = readFileSync("lib/db/application-queries.ts", "utf8");
 
   it("marks the assessment and the vacancy text on both review routes", () => {
     expect(shared).toContain("isMetadataOnly(vacancy)");
@@ -94,7 +95,7 @@ describe("limited reliability is visible in the interface", () => {
 
   it("marks a thin vacancy in the list without loading full vacancy texts", () => {
     expect(list).toContain("METADATA_ONLY_BADGE");
-    expect(list).toContain("length(btrim(");
-    expect(list).not.toContain("originalText: vacancies.originalText");
+    expect(listQuery).toContain("length(btrim(");
+    expect(listQuery).not.toContain("originalText: vacancies.originalText");
   });
 });

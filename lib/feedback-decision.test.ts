@@ -41,7 +41,7 @@ describe("the server refuses to store a decision that was not taken", () => {
 
   it("rejects a submit without a verdict before touching the database", () => {
     expect(actions).toContain('if(!isFeedbackDecision(form.get("value")))return{status:"error",message:NO_DECISION_MESSAGE}');
-    expect(actions.indexOf("isFeedbackDecision(form")).toBeLessThan(actions.indexOf("persistFeedback(x"));
+    expect(actions.indexOf("isFeedbackDecision(form")).toBeLessThan(actions.indexOf("storeFeedback(getDb()"));
   });
 
   it("guards the calibration action with exactly the same rule", () => {
@@ -50,8 +50,8 @@ describe("the server refuses to store a decision that was not taken", () => {
   });
 
   it("routes both flows through the single eligibility boundary", () => {
-    expect(actions.match(/persistFeedback\(/g)?.length).toBe(3);
-    expect(actions).toContain("eligibleFeedbackValues");
+    expect(actions.match(/storeFeedback\(/g)?.length).toBe(2);
+    expect(readFileSync("lib/db/feedback.ts", "utf8")).toContain("eligibleFeedbackValues");
   });
 });
 
