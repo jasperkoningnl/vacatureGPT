@@ -22,7 +22,7 @@ const stepEnvironment = [
 export function pipelineSteps(env: AlertEnvironment): PipelineStep[] {
   return stepEnvironment.map(([name, variable]) => ({
     name,
-    outcome: env[variable] || "skipped",
+    outcome: variable === "DISCOVERY_STATUS" && Number(env.DISCOVERY_ERRORS || 0) > 0 ? "warning" : env[variable] || "skipped",
   }));
 }
 
@@ -31,7 +31,7 @@ export async function sendPipelineFailureAlert(
   fetchImplementation: Fetch = fetch,
 ): Promise<"not-needed" | "sent"> {
   const steps = pipelineSteps(env);
-  const failures = steps.filter((step) => step.outcome === "failure" || step.outcome === "cancelled");
+  const failures = steps.filter((step) => step.outcome === "failure" || step.outcome === "cancelled" || step.outcome === "warning");
 
   if (failures.length === 0) {
     console.log("Pipeline succeeded; no failure alert needed.");
