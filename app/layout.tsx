@@ -1,1 +1,13 @@
-import "./globals.css"; import Link from "next/link"; export const metadata={title:"VacatureGPT",description:"Persoonlijke vacaturezoeker",robots:{index:false,follow:false}}; export default function Layout({children}:{children:React.ReactNode}){return <html lang="nl"><body><header className="site-header"><nav className="shell"><Link className="brand" href="/">VacatureGPT</Link><Link className="nav-primary" href="/kalibreren">Beoordelen</Link><Link href="/">Mijn selectie</Link><Link className="nav-secondary" href="/vacatures">Alle vacatures</Link><Link href="/voorkeuren">Voorkeuren</Link><Link href="/bronnen">Bronnen</Link></nav></header><main className="shell">{children}</main></body></html>}
+import "./globals.css";
+import { SiteNav } from "./components/site-nav";
+
+export const metadata = { title: "VacatureGPT", description: "Persoonlijke vacaturezoeker", robots: { index: false, follow: false } };
+export const viewport = { themeColor: "#205c43" };
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return <html lang="nl"><body>
+    <a className="skip-link" href="#hoofdinhoud">Naar de hoofdinhoud</a>
+    <header className="site-header"><SiteNav/></header>
+    <main className="shell" id="hoofdinhoud" tabIndex={-1}>{children}</main>
+  </body></html>;
+}

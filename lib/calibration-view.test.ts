@@ -22,7 +22,27 @@ describe("shared vacancy review", () => {
     expect(calibration).toContain("saveCalibrationReason");
     expect(calibration).toContain("!reveal.agreed && !reasonSaved");
     expect(calibration).toContain("reveal.agreed || reasonSaved");
-    expect(actions).toContain("learningEligible:true");
+    expect(actions).toContain("storeFeedbackReason(getDb(),x)");
+  });
+
+  it("slaat een blind oordeel op zonder reden, maar pas als leersignaal na de aanvulling", () => {
+    const store = readFileSync("lib/db/feedback.ts", "utf8");
+    expect(actions).toContain("storeFeedback(db,{vacancyId:x.vacancyId,value:x.value},{requireReason:false})");
+    expect(store).toContain("if (requireReason) assertFeedbackIsComplete(validated);");
+    expect(store).toContain("export async function storeFeedbackReason");
+  });
+
+  it("rondt de batch af met een route naar Mijn selectie naast een nieuwe ronde", () => {
+    expect(calibration).toContain('<Link className="button" href="/">Naar mijn selectie</Link>');
+    expect(calibration).toContain('<a className="button secondary" href="/kalibreren">Nog 5 beoordelen</a>');
+    expect(calibration).toContain("Je zojuist als interessant beoordeelde vacatures staan nu in Mijn selectie.");
+  });
+
+  it("geeft de voortgangsbalk echte progressbar-semantiek", () => {
+    expect(calibration).toContain('role="progressbar"');
+    expect(calibration).toContain("aria-valuenow={index + 1}");
+    expect(calibration).toContain("aria-valuemax={vacancies.length}");
+    expect(calibration).toContain("aria-valuemin={0}");
   });
   it("removes the obsolete calibration detail route and read-more flow", () => {
     expect(existsSync("app/kalibreren/vacatures/[id]/page.tsx")).toBe(false);

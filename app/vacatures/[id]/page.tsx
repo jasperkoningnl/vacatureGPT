@@ -15,6 +15,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     .orderBy(desc(vacancyOccurrences.active), desc(vacancyOccurrences.lastSeenAt), asc(vacancyOccurrences.id)).limit(1);
   if (!result) notFound();
   return <VacancyReviewDetail vacancy={result.vacancy} assessment={result.assessment} sourceUrl={result.sourceUrl} sourceName={result.source} backLink={{ href: "/vacatures", label: "Terug naar vacatures" }} tracking={<TrackingForm vacancyId={result.vacancy.id} tracking={result.tracking}/>} review={
-    <FeedbackForm vacancyId={result.vacancy.id} current={result.feedback && { value: result.feedback.value, reasonCode: result.feedback.reasonCode, note: result.feedback.note }}/>
+    <FeedbackForm vacancyId={result.vacancy.id} aiVerdict={result.assessment?.verdict ?? null} current={result.feedback && { value: result.feedback.value, reasonCode: result.feedback.reasonCode, note: result.feedback.note }}/>
   }/>;
 }

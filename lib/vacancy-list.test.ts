@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { and } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { buildVacancyListConditions, dedupeVacancyRows, parseVacancyListFilters, resolveSourceFilter, type VacancyListFilters } from "./vacancy-list";
+import { buildVacancyListConditions, dedupeVacancyRows, parseVacancyListFilters, resolveSourceFilter, showsRejected, type VacancyListFilters } from "./vacancy-list";
 
 const dialect = new PgDialect();
 const toSql = (filters: Partial<VacancyListFilters>) => dialect.sqlToQuery(and(...buildVacancyListConditions({ sort: "newest", ...filters }))!);
@@ -95,15 +95,15 @@ describe("resolveSourceFilter", () => {
 });
 
 describe("buildVacancyListConditions", () => {
-  it("filtert altijd op actieve vacatures", () => {
+  it("filtert altijd op actieve vacatures en legt afgewezen vacatures standaard weg", () => {
     expect(toSql({}).sql).toContain('"vacancies"."active" = $1');
-    expect(toSql({}).params).toEqual([true]);
+    expect(toSql({}).params).toEqual([true, "not_suitable"]);
   });
 
   it("vertaalt geldige filters naar de verwachte condities", () => {
     const promising = toSql({ ai: "promising" });
     expect(promising.sql).toContain('"ai_assessments"."verdict" in');
-    expect(promising.params).toEqual([true, "interesting", "maybe"]);
+    expect(promising.params).toEqual([true, "not_suitable", "interesting", "maybe"]);
     const reviewed = toSql({ feedback: "not_suitable", salary: "known", city: "Utrecht", source: "villamedia" });
     expect(reviewed.params).toEqual([true, "%Utrecht%", "villamedia", "not_suitable"]);
     expect(reviewed.sql).toContain('"vacancies"."salary_min" is not null');
@@ -111,10 +111,10 @@ describe("buildVacancyListConditions", () => {
   });
 
   it("stuurt onbekende filterwaarden nooit door naar Postgres", () => {
-    const query = toSql(parseVacancyListFilters({ feedback: "xyz", ai: "kaboom" }));
-    expect(query.params).toEqual([true]);
+    const query = toSql(parseVacancyListFilters({ feedback: "xyz", ai: "kaboom", rejected: "kapot" }));
+    expect(query.params).toEqual([true, "not_suitable"]);
     expect(query.sql).not.toContain("verdict");
-    expect(query.sql).not.toContain('"feedback"."value"');
+    expect(query.sql).not.toContain('"feedback"."value" = ');
   });
 });
 
@@ -134,5 +134,35 @@ describe("parseVacancyListFilters is crashbestendig", () => {
   it("valt terug op de standaardfilters bij onbruikbare invoer", () => {
     const filters = parseVacancyListFilters({ city: 42, feedback: { value: "interesting" } } as unknown as Record<string, string | string[] | undefined>);
     expect(filters).toEqual({ city: undefined, employer: undefined, source: undefined, salary: undefined, feedback: undefined, ai: undefined, sort: "newest" });
+  });
+});
+
+describe("afgewezen vacatures staan standaard buiten de lijst", () => {
+  it("sluit 'niet passend' uit zolang je er niet zelf om vraagt", () => {
+    const { sql } = toSql({});
+    expect(sql).toContain('"feedback"."value" is null or "feedback"."value" <> $');
+  });
+
+  it("laat ze terugkomen met de expliciete schakelaar", () => {
+    expect(showsRejected({ rejected: "show" })).toBe(true);
+    expect(toSql({ rejected: "show" }).sql).not.toContain('"feedback"."value" <>');
+  });
+
+  it("laat ze ook terugkomen als je er expliciet op filtert", () => {
+    expect(showsRejected({ feedback: "not_suitable" })).toBe(true);
+    expect(toSql({ feedback: "not_suitable" }).sql).not.toContain('"feedback"."value" <>');
+  });
+
+  it("blijft ze verbergen bij elk ander oordeelfilter", () => {
+    for (const feedback of ["unreviewed", "interesting", "maybe"] as const) {
+      expect(showsRejected({ feedback })).toBe(false);
+      expect(toSql({ feedback }).sql).toContain('"feedback"."value" <>');
+    }
+  });
+
+  it("accepteert alleen de waarde 'show' en negeert gerommel in de queryparameter", () => {
+    expect(parseVacancyListFilters({ rejected: "show" }).rejected).toBe("show");
+    expect(parseVacancyListFilters({ rejected: "true" }).rejected).toBeUndefined();
+    expect(parseVacancyListFilters({ rejected: "'; drop table feedback; --" }).rejected).toBeUndefined();
   });
 });
