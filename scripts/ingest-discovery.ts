@@ -2,24 +2,21 @@ import { eq } from "drizzle-orm";
 import { appendFile } from "node:fs/promises";
 import { getDb } from "../lib/db";
 import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
-import { companyTitleKey, discoveryUrlsInRawData, readDiscoveryFeed, isDiscoveryDuplicate, normalizeDiscoveryUrl, type DiscoveryVacancy } from "../lib/ingestion/discovery-feed";
+import { DISCOVERY_SOURCES, formatDiscoverySummary, planDiscoveryImport, readDiscoveryFeeds, type DiscoverySourceKey } from "../lib/ingestion/discovery-import";
+import { normalizeDiscoveryUrl, type DiscoveryVacancy } from "../lib/ingestion/discovery-feed";
 import { recomputeVacancyActivity, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
 
 const repository = process.env.GITHUB_REPOSITORY || "jasperkoningnl/vacatureGPT";
-
 const db = getDb();
-const feedUrl = `https://github.com/${repository}/blob/main/data/discovery/chatgpt/latest.json`;
-const [source] = await db.insert(sources).values({ slug: "github-discovery", name: "GitHub discovery feed", baseUrl: feedUrl, enabled: true })
-  .onConflictDoUpdate({ target: sources.slug, set: { name: "GitHub discovery feed", baseUrl: feedUrl, enabled: true } }).returning();
-const [run] = await db.insert(sourceRuns).values({ sourceId: source.id }).returning();
+const feedResults = await readDiscoveryFeeds();
+const sourceState = new Map<DiscoverySourceKey, { sourceId: number; runId: number }>();
 
-async function writeSummary(found: number, imported: number, duplicates: number, errors: string[]) {
-  const lines = ["## GitHub discovery import", "", "| Resultaat | Aantal |", "| --- | ---: |", `| Discovery postings gevonden | ${found} |`,
-    `| Nieuw geïmporteerd | ${imported} |`, `| Overgeslagen als duplicate | ${duplicates} |`, `| Fouten | ${errors.length} |`];
-  if (errors.length) lines.push("", "### Fouten", ...errors.map((error) => `- ${error}`));
-  console.log(`Discovery summary: found=${found}, imported=${imported}, duplicates=${duplicates}, errors=${errors.length}`);
-  if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `found=${found}\nimported=${imported}\nduplicates=${duplicates}\nerrors=${errors.length}\n`, "utf8");
-  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`, "utf8");
+for (const config of DISCOVERY_SOURCES) {
+  const baseUrl = `https://github.com/${repository}/blob/main/${config.path}`;
+  const [source] = await db.insert(sources).values({ slug: config.slug, name: config.name, baseUrl, enabled: true })
+    .onConflictDoUpdate({ target: sources.slug, set: { name: config.name, baseUrl, enabled: true } }).returning();
+  const [run] = await db.insert(sourceRuns).values({ sourceId: source.id }).returning();
+  sourceState.set(config.key, { sourceId: source.id, runId: run.id });
 }
 
 function values(item: DiscoveryVacancy) {
@@ -30,52 +27,52 @@ function values(item: DiscoveryVacancy) {
     firstSeenAt: item.firstSeenAt, lastSeenAt: new Date(), active: true };
 }
 
-let found = 0; let imported = 0; let duplicates = 0; let errors: string[] = [];
-try {
-  const feed = await readDiscoveryFeed();
-  found = feed.postingsFound; errors = feed.errors;
-  const existingVacancies = await db.select({ id: vacancies.id, employer: vacancies.employer, title: vacancies.title }).from(vacancies);
-  const existingOccurrences = await db.select({ id: vacancyOccurrences.id, vacancyId: vacancyOccurrences.vacancyId, sourceId: vacancyOccurrences.sourceId, sourceUrl: vacancyOccurrences.sourceUrl, rawData: vacancyOccurrences.rawData }).from(vacancyOccurrences);
-  const urlToVacancy = new Map<string, number>();
-  for (const row of existingOccurrences) {
-    const occurrenceUrl = normalizeDiscoveryUrl(row.sourceUrl);
-    if (occurrenceUrl) urlToVacancy.set(occurrenceUrl, row.vacancyId);
-    for (const rawUrl of discoveryUrlsInRawData(row.rawData)) urlToVacancy.set(rawUrl, row.vacancyId);
-  }
-  const knownUrls = new Set(urlToVacancy.keys());
-  const knownCompanyTitles = new Set(existingVacancies.map((row) => companyTitleKey(row.employer, row.title)));
-  const companyTitleToVacancy = new Map(existingVacancies.map((row) => [companyTitleKey(row.employer, row.title), row.id]));
+const existingVacancies = await db.select({ id: vacancies.id, employer: vacancies.employer, title: vacancies.title }).from(vacancies);
+const existingOccurrences = await db.select({ id: vacancyOccurrences.id, vacancyId: vacancyOccurrences.vacancyId, sourceId: vacancyOccurrences.sourceId, sourceUrl: vacancyOccurrences.sourceUrl, rawData: vacancyOccurrences.rawData }).from(vacancyOccurrences);
+const plan = planDiscoveryImport(feedResults, existingVacancies, existingOccurrences);
+const createdVacancies = new Map<string, number>();
+const stats = new Map(DISCOVERY_SOURCES.map(({ key }) => [key, { imported: 0, duplicates: 0 }]));
 
-  for (const item of feed.vacancies) {
-    const duplicate = isDiscoveryDuplicate(item, knownUrls, knownCompanyTitles);
-    if (duplicate) {
-      duplicates++;
-      const vacancyId = (item.normalizedDirectUrl ? urlToVacancy.get(item.normalizedDirectUrl) : undefined)
-        ?? (item.normalizedSourceUrl ? urlToVacancy.get(item.normalizedSourceUrl) : undefined)
-        ?? companyTitleToVacancy.get(item.companyTitleKey);
-      if (!vacancyId) throw new Error(`Duplicate kon niet aan een bestaande vacature worden gekoppeld: ${item.employer} / ${item.title}`);
-      const occurrence = existingOccurrences.find((row) => row.sourceId === source.id && normalizeDiscoveryUrl(row.sourceUrl) === normalizeDiscoveryUrl(item.sourceUrl));
-      if (occurrence) await db.update(vacancyOccurrences).set({ sourceRunId: run.id, lastSeenAt: new Date(), active: true, rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
-      else await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, sourceUrl: item.sourceUrl, rawData: item.rawData, active: true })
-        .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, lastSeenAt: new Date(), active: true, rawData: item.rawData } });
-      await recomputeVacancyActivity([vacancyId]);
-      continue;
-    }
-    const [created] = await db.insert(vacancies).values(values(item)).returning({ id: vacancies.id });
-    await db.insert(vacancyOccurrences).values({ vacancyId: created.id, sourceId: source.id, sourceRunId: run.id, sourceUrl: item.sourceUrl, rawData: item.rawData, active: true });
-    imported++;
-    if (item.normalizedDirectUrl) knownUrls.add(item.normalizedDirectUrl);
-    if (item.normalizedSourceUrl) knownUrls.add(item.normalizedSourceUrl);
-    knownCompanyTitles.add(item.companyTitleKey);
-    urlToVacancy.set(item.sourceUrl, created.id);
-    companyTitleToVacancy.set(item.companyTitleKey, created.id);
-  }
-  await reconcileSuccessfulSourceRun(source.id, run.id);
-  await db.update(sourceRuns).set({ status: errors.length ? "warning" : "success", finishedAt: new Date(), resultCount: found, newCount: imported, warnings: errors }).where(eq(sourceRuns.id, run.id));
-  await writeSummary(found, imported, duplicates, errors);
-} catch (error) {
-  const message = error instanceof Error ? error.message : "Onbekende discovery-importfout";
-  await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: found, newCount: imported, warnings: errors, error: message }).where(eq(sourceRuns.id, run.id));
-  await writeSummary(found, imported, duplicates, [...errors, message]);
-  throw error;
+for (const planned of plan) {
+  const state = sourceState.get(planned.source)!;
+  let vacancyId = planned.existingVacancyId ?? (planned.newVacancyKey ? createdVacancies.get(planned.newVacancyKey) : undefined);
+  if (!planned.duplicate) {
+    const [created] = await db.insert(vacancies).values(values(planned.item)).returning({ id: vacancies.id });
+    vacancyId = created.id;
+    createdVacancies.set(planned.newVacancyKey!, vacancyId);
+    stats.get(planned.source)!.imported++;
+  } else stats.get(planned.source)!.duplicates++;
+  if (!vacancyId) throw new Error(`Geplande discovery-vacature kon niet worden gekoppeld: ${planned.item.employer} / ${planned.item.title}`);
+
+  const occurrence = existingOccurrences.find((row) => row.sourceId === state.sourceId && normalizeDiscoveryUrl(row.sourceUrl) === normalizeDiscoveryUrl(planned.item.sourceUrl));
+  if (occurrence) await db.update(vacancyOccurrences).set({ vacancyId, sourceRunId: state.runId, lastSeenAt: new Date(), active: true, rawData: planned.item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
+  else await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: state.sourceId, sourceRunId: state.runId, sourceUrl: planned.item.sourceUrl, rawData: planned.item.rawData, active: true })
+    .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: state.runId, lastSeenAt: new Date(), active: true, rawData: planned.item.rawData } });
+  await recomputeVacancyActivity([vacancyId]);
 }
+
+for (const result of feedResults) {
+  const state = sourceState.get(result.source.key)!;
+  const counts = stats.get(result.source.key)!;
+  const errors = [...result.errors, ...(result.fatalError ? [result.fatalError] : [])];
+  if (!result.fatalError) await reconcileSuccessfulSourceRun(state.sourceId, state.runId);
+  await db.update(sourceRuns).set({ status: result.fatalError ? "error" : errors.length ? "warning" : "success", finishedAt: new Date(),
+    resultCount: result.found, newCount: counts.imported, warnings: result.errors, error: result.fatalError }).where(eq(sourceRuns.id, state.runId));
+}
+
+const totalImported = [...stats.values()].reduce((sum, value) => sum + value.imported, 0);
+for (const result of feedResults) {
+  const counts = stats.get(result.source.key)!;
+  const errors = [...result.errors, ...(result.fatalError ? [result.fatalError] : [])];
+  console.log(`${result.source.name}: found=${result.found}, imported=${counts.imported}, duplicates=${counts.duplicates}, errors=${errors.length}`);
+}
+const output = feedResults.map((result) => {
+  const counts = stats.get(result.source.key)!;
+  const errorCount = result.errors.length + (result.fatalError ? 1 : 0);
+  return `${result.source.key}_found=${result.found}\n${result.source.key}_imported=${counts.imported}\n${result.source.key}_duplicates=${counts.duplicates}\n${result.source.key}_errors=${errorCount}`;
+});
+output.push(`imported=${totalImported}`, `found=${feedResults.reduce((sum, item) => sum + item.found, 0)}`, `duplicates=${[...stats.values()].reduce((sum, item) => sum + item.duplicates, 0)}`, `errors=${feedResults.reduce((sum, item) => sum + item.errors.length + (item.fatalError ? 1 : 0), 0)}`);
+if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `${output.join("\n")}\n`, "utf8");
+if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `${formatDiscoverySummary(feedResults, stats)}\n`, "utf8");
+
+if (feedResults.every((result) => result.fatalError)) throw new Error("Geen enkele discovery-feed kon worden verwerkt.");

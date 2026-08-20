@@ -63,7 +63,7 @@ jobs:
         continue-on-error: true
         run: pnpm ingest:overheid
 
-      - name: Import GitHub discovery feed
+      - name: Import supplemental discovery feeds
         id: discovery
         continue-on-error: true
         run: pnpm ingest:discovery
@@ -87,6 +87,7 @@ jobs:
           CULTURELE_STATUS: ${{ steps.culturele.outcome }}
           OVERHEID_STATUS: ${{ steps.overheid.outcome }}
           DISCOVERY_STATUS: ${{ steps.discovery.outcome }}
+          DISCOVERY_ERRORS: ${{ steps.discovery.outputs.errors || '0' }}
           CLEANUP_STATUS: ${{ steps.cleanup.outcome }}
           AI_STATUS: ${{ steps.ai.outcome }}
         run: |
@@ -108,11 +109,10 @@ jobs:
             echo "| Villamedia | $(status_label "$VILLAMEDIA_STATUS") |"
             echo "| Culturele Vacatures | $(status_label "$CULTURELE_STATUS") |"
             echo "| Werken bij de Overheid | $(status_label "$OVERHEID_STATUS") |"
-            echo "| GitHub discovery | $(status_label "$DISCOVERY_STATUS") |"
-            echo "| Discovery postings gevonden | ${{ steps.discovery.outputs.found || '0' }} |"
-            echo "| Discovery nieuw geïmporteerd | ${{ steps.discovery.outputs.imported || '0' }} |"
-            echo "| Discovery duplicates overgeslagen | ${{ steps.discovery.outputs.duplicates || '0' }} |"
-            echo "| Discovery fouten | ${{ steps.discovery.outputs.errors || '0' }} |"
+            echo "| Supplemental discovery | $(status_label "$DISCOVERY_STATUS") |"
+            echo "| ChatGPT discovery (found / imported / duplicates / errors) | ${{ steps.discovery.outputs.chatgpt_found || '0' }} / ${{ steps.discovery.outputs.chatgpt_imported || '0' }} / ${{ steps.discovery.outputs.chatgpt_duplicates || '0' }} / ${{ steps.discovery.outputs.chatgpt_errors || '0' }} |"
+            echo "| Claude discovery (found / imported / duplicates / errors) | ${{ steps.discovery.outputs.claude_found || '0' }} / ${{ steps.discovery.outputs.claude_imported || '0' }} / ${{ steps.discovery.outputs.claude_duplicates || '0' }} / ${{ steps.discovery.outputs.claude_errors || '0' }} |"
+            echo "| Discovery totaal nieuw geïmporteerd | ${{ steps.discovery.outputs.imported || '0' }} |"
             echo "| Expiry cleanup | $(status_label "$CLEANUP_STATUS") |"
             echo "| AI assessment | $(status_label "$AI_STATUS") |"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -133,6 +133,7 @@ jobs:
           CULTURELE_STATUS: ${{ steps.culturele.outcome }}
           OVERHEID_STATUS: ${{ steps.overheid.outcome }}
           DISCOVERY_STATUS: ${{ steps.discovery.outcome }}
+          DISCOVERY_ERRORS: ${{ steps.discovery.outputs.errors || '0' }}
           CLEANUP_STATUS: ${{ steps.cleanup.outcome }}
           AI_STATUS: ${{ steps.ai.outcome }}
         run: pnpm email:pipeline-failure
