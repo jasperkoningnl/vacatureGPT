@@ -1,30 +1,13 @@
 import Link from "next/link";
-import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { aiAssessments, feedback, sources, vacancies, vacancyOccurrences } from "@/lib/db/schema";
-import { buildVacancyListConditions, dedupeVacancyRows, parseVacancyListFilters, resolveSourceFilter, vacancyListOrdering, type RawSearchParams } from "@/lib/vacancy-list";
+import { queryVacancyList } from "@/lib/db/application-queries";
+import { type RawSearchParams } from "@/lib/vacancy-list";
 
 export const dynamic = "force-dynamic";
 const verdictLabels = { interesting: "Interessant", maybe: "Misschien", not_suitable: "Niet passend" } as const;
 
 export default async function Page({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
-  const db = getDb();
-  const sourceOptions = await db.select({ slug: sources.slug, name: sources.name }).from(sources).orderBy(asc(sources.name));
-  const parsed = parseVacancyListFilters(await searchParams);
-  const q = { ...parsed, source: resolveSourceFilter(parsed.source, sourceOptions.map((option) => option.slug)) };
-  const rows = await db.select({
-    id: vacancies.id, title: vacancies.title, employer: vacancies.employer, location: vacancies.location,
-    hoursMin: vacancies.hoursMin, hoursMax: vacancies.hoursMax, salaryMin: vacancies.salaryMin,
-    salaryMax: vacancies.salaryMax, salaryOriginal: vacancies.salaryOriginal, deadline: vacancies.deadline,
-    url: vacancyOccurrences.sourceUrl, source: sources.name, feedback: feedback.value,
-    aiScore: aiAssessments.score, aiVerdict: aiAssessments.verdict,
-  }).from(vacancies)
-    .innerJoin(vacancyOccurrences, and(eq(vacancies.id, vacancyOccurrences.vacancyId), eq(vacancyOccurrences.active, true)))
-    .innerJoin(sources, eq(vacancyOccurrences.sourceId, sources.id))
-    .leftJoin(feedback, eq(vacancies.id, feedback.vacancyId))
-    .leftJoin(aiAssessments, eq(vacancies.id, aiAssessments.vacancyId))
-    .where(and(...buildVacancyListConditions(q))).orderBy(vacancyListOrdering(q.sort), asc(vacancyOccurrences.id));
-  const items = dedupeVacancyRows(rows);
+  const { sourceOptions, filters: q, items } = await queryVacancyList(getDb(), await searchParams);
 
   return <><div className="page-title"><div><p className="eyebrow">Volledige actieve vacaturelijst</p><h1>Alle vacatures</h1></div><span className="muted">{items.length} {items.length === 1 ? "vacature" : "vacatures"}</span></div><form className="filters">
     <input name="city" placeholder="Stad" defaultValue={q.city}/><input name="employer" placeholder="Werkgever" defaultValue={q.employer}/>

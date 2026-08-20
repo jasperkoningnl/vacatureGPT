@@ -121,4 +121,20 @@ describe("migration journal", () => {
       "0007_source_run_skipped",
     ]);
   });
+
+  it("heeft voor iedere geregistreerde migratie een Drizzle-snapshot in één keten", () => {
+    const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as {
+      entries: Array<{ idx: number }>;
+    };
+    let previousId = "00000000-0000-0000-0000-000000000000";
+
+    for (const { idx } of journal.entries) {
+      const snapshot = JSON.parse(readFileSync(`drizzle/meta/${String(idx).padStart(4, "0")}_snapshot.json`, "utf8")) as {
+        id: string;
+        prevId: string;
+      };
+      expect(snapshot.prevId, `snapshot ${idx} sluit niet aan op zijn voorganger`).toBe(previousId);
+      previousId = snapshot.id;
+    }
+  });
 });

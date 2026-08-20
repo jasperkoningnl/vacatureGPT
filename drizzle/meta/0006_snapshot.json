@@ -1,9 +1,324 @@
 {
-  "id": "edf33ffa-1c9c-446d-b878-f46e073d8565",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "3ca7e454-f207-44df-8cc3-552df8cd55b2",
+  "prevId": "7aa61375-64bc-4eb2-bd02-0c62c1619334",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.ai_assessments": {
+      "name": "ai_assessments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "vacancy_id": {
+          "name": "vacancy_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vacancy_content_hash": {
+          "name": "vacancy_content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "profile_hash": {
+          "name": "profile_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt_version": {
+          "name": "prompt_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "score": {
+          "name": "score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verdict": {
+          "name": "verdict",
+          "type": "feedback_value",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "positives": {
+          "name": "positives",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "concerns": {
+          "name": "concerns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assessed_at": {
+          "name": "assessed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ai_assessments_vacancy_idx": {
+          "name": "ai_assessments_vacancy_idx",
+          "columns": [
+            {
+              "expression": "vacancy_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ai_assessments_score_idx": {
+          "name": "ai_assessments_score_idx",
+          "columns": [
+            {
+              "expression": "score",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ai_assessments_vacancy_id_vacancies_id_fk": {
+          "name": "ai_assessments_vacancy_id_vacancies_id_fk",
+          "tableFrom": "ai_assessments",
+          "tableTo": "vacancies",
+          "columnsFrom": [
+            "vacancy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.email_digest_items": {
+      "name": "email_digest_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vacancy_id": {
+          "name": "vacancy_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "email_digest_items_run_vacancy_idx": {
+          "name": "email_digest_items_run_vacancy_idx",
+          "columns": [
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "vacancy_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "email_digest_items_vacancy_idx": {
+          "name": "email_digest_items_vacancy_idx",
+          "columns": [
+            {
+              "expression": "vacancy_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "email_digest_items_run_id_email_digest_runs_id_fk": {
+          "name": "email_digest_items_run_id_email_digest_runs_id_fk",
+          "tableFrom": "email_digest_items",
+          "tableTo": "email_digest_runs",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "email_digest_items_vacancy_id_vacancies_id_fk": {
+          "name": "email_digest_items_vacancy_id_vacancies_id_fk",
+          "tableFrom": "email_digest_items",
+          "tableTo": "vacancies",
+          "columnsFrom": [
+            "vacancy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.email_digest_runs": {
+      "name": "email_digest_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "run_key": {
+          "name": "run_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "email_digest_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_message_id": {
+          "name": "provider_message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "email_digest_runs_run_key_idx": {
+          "name": "email_digest_runs_run_key_idx",
+          "columns": [
+            {
+              "expression": "run_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.feedback": {
       "name": "feedback",
       "schema": "",
@@ -27,6 +342,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "ai_verdict": {
+          "name": "ai_verdict",
+          "type": "feedback_value",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
         "reason_code": {
           "name": "reason_code",
           "type": "text",
@@ -38,6 +360,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "learning_eligible": {
+          "name": "learning_eligible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -377,6 +706,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "hours_original": {
+          "name": "hours_original",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "salary_min": {
           "name": "salary_min",
           "type": "integer",
@@ -391,6 +726,18 @@
         },
         "salary_period": {
           "name": "salary_period",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_basis_hours": {
+          "name": "salary_basis_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_original": {
+          "name": "salary_original",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -554,6 +901,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         }
       },
       "indexes": {
@@ -574,6 +928,48 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "occurrence_external_id_idx": {
+          "name": "occurrence_external_id_idx",
+          "columns": [
+            {
+              "expression": "source_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "occurrence_active_last_seen_idx": {
+          "name": "occurrence_active_last_seen_idx",
+          "columns": [
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "last_seen_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -612,6 +1008,94 @@
           "tableTo": "source_runs",
           "columnsFrom": [
             "source_run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vacancy_tracking": {
+      "name": "vacancy_tracking",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "vacancy_id": {
+          "name": "vacancy_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "shortlisted_at": {
+          "name": "shortlisted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "application_status": {
+          "name": "application_status",
+          "type": "application_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "vacancy_tracking_vacancy_idx": {
+          "name": "vacancy_tracking_vacancy_idx",
+          "columns": [
+            {
+              "expression": "vacancy_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "vacancy_tracking_vacancy_id_vacancies_id_fk": {
+          "name": "vacancy_tracking_vacancy_id_vacancies_id_fk",
+          "tableFrom": "vacancy_tracking",
+          "tableTo": "vacancies",
+          "columnsFrom": [
+            "vacancy_id"
           ],
           "columnsTo": [
             "id"
@@ -675,6 +1159,26 @@
     }
   },
   "enums": {
+    "public.application_status": {
+      "name": "application_status",
+      "schema": "public",
+      "values": [
+        "want_to_apply",
+        "applied",
+        "interview",
+        "rejected",
+        "no_longer_interested"
+      ]
+    },
+    "public.email_digest_status": {
+      "name": "email_digest_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "sent",
+        "failed"
+      ]
+    },
     "public.feedback_value": {
       "name": "feedback_value",
       "schema": "public",

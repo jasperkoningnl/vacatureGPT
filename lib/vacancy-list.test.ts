@@ -121,8 +121,7 @@ describe("buildVacancyListConditions", () => {
 describe("/vacatures gebruikt de gevalideerde querylaag", () => {
   const page = readFileSync("app/vacatures/page.tsx", "utf8");
   it("bouwt de query met de gedeelde helpers en telt ontdubbelde vacatures", () => {
-    expect(page).toContain("buildVacancyListConditions(q)");
-    expect(page).toContain("dedupeVacancyRows(rows)");
+    expect(page).toContain("queryVacancyList(getDb(), await searchParams)");
     expect(page).toContain("{items.length}");
     expect(page).not.toContain("as keyof typeof verdictLabels");
   });

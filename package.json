@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit generate --name schema_drift_check && test -z \"$(git status --porcelain -- drizzle)\"",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "ingest": "tsx scripts/ingest-oneworld.ts",
@@ -38,6 +39,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.5",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",

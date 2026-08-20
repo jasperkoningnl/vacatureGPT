@@ -1,6 +1,6 @@
 {
-  "id": "edf33ffa-1c9c-446d-b878-f46e073d8565",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "f1bb4ae6-fed3-4489-88d4-f42e1a5eb91d",
+  "prevId": "edf33ffa-1c9c-446d-b878-f46e073d8565",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -377,6 +377,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "hours_original": {
+          "name": "hours_original",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "salary_min": {
           "name": "salary_min",
           "type": "integer",
@@ -391,6 +397,18 @@
         },
         "salary_period": {
           "name": "salary_period",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_basis_hours": {
+          "name": "salary_basis_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_original": {
+          "name": "salary_original",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -574,6 +592,27 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "occurrence_external_id_idx": {
+          "name": "occurrence_external_id_idx",
+          "columns": [
+            {
+              "expression": "source_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
