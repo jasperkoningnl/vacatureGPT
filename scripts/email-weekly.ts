@@ -1,13 +1,15 @@
 import { appendFile } from "node:fs/promises";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../lib/db";
-import { aiAssessments, emailDigestItems, emailDigestRuns, feedback, vacancies } from "../lib/db/schema";
+import { latestFeedbackPerVacancy } from "../lib/db/latest-feedback";
+import { aiAssessments, emailDigestItems, emailDigestRuns, vacancies } from "../lib/db/schema";
 import { buildWeeklyDigest, digestBoundary, selectWeeklyVacancies, weeklyRunKey, type DigestVacancy } from "../lib/email/weekly-digest";
 
 type Outcome = { eligible: number; included: number; status: "disabled" | "skipped" | "sent" | "failed"; message: string; runKey: string };
 const now = new Date();
 const runKey = weeklyRunKey(now);
 const db = getDb();
+const feedback = latestFeedbackPerVacancy(db);
 let outcome: Outcome = { eligible: 0, included: 0, status: "failed", message: "Digest niet voltooid", runKey };
 let activeRunId: number | null = null;
 

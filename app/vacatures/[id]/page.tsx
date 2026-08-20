@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { aiAssessments, feedback, sources, vacancies, vacancyOccurrences, vacancyTracking } from "@/lib/db/schema";
+import { latestFeedbackPerVacancy } from "@/lib/db/latest-feedback";
+import { aiAssessments, sources, vacancies, vacancyOccurrences, vacancyTracking } from "@/lib/db/schema";
 import { VacancyReviewDetail } from "@/app/components/vacancy-review-detail";
 import { FeedbackForm } from "@/app/components/feedback-form";
 import { TrackingForm } from "@/app/components/tracking-form";
@@ -9,7 +10,9 @@ import { TrackingForm } from "@/app/components/tracking-form";
 export const dynamic = "force-dynamic";
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [result] = await getDb().select({ vacancy: vacancies, sourceUrl: vacancyOccurrences.sourceUrl, source: sources.name, feedback, assessment: aiAssessments, tracking: vacancyTracking })
+  const db = getDb();
+  const feedback = latestFeedbackPerVacancy(db);
+  const [result] = await db.select({ vacancy: vacancies, sourceUrl: vacancyOccurrences.sourceUrl, source: sources.name, feedback: { value: feedback.value, reasonCode: feedback.reasonCode, note: feedback.note }, assessment: aiAssessments, tracking: vacancyTracking })
     .from(vacancies).innerJoin(vacancyOccurrences, eq(vacancies.id, vacancyOccurrences.vacancyId)).innerJoin(sources, eq(sources.id, vacancyOccurrences.sourceId))
     .leftJoin(feedback, eq(feedback.vacancyId, vacancies.id)).leftJoin(aiAssessments, eq(aiAssessments.vacancyId, vacancies.id)).leftJoin(vacancyTracking, eq(vacancyTracking.vacancyId, vacancies.id)).where(eq(vacancies.id, Number(id)))
     .orderBy(desc(vacancyOccurrences.active), desc(vacancyOccurrences.lastSeenAt), asc(vacancyOccurrences.id)).limit(1);

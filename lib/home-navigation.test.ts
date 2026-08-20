@@ -93,7 +93,7 @@ describe("toegankelijkheid van het raamwerk", () => {
   });
 
   it("labelt elk filter in plaats van alleen een placeholder te tonen", () => {
-    expect(list.match(/className="filter-field"/g)?.length).toBe(7);
+    expect(list.match(/className="filter-field"/g)?.length).toBe(8);
     expect(list).toContain('<label className="filter-toggle">');
     expect(list).not.toMatch(/<input name="city" placeholder="Stad"\/>/);
   });

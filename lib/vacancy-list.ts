@@ -1,3 +1,4 @@
+import type { AnyColumn } from "drizzle-orm";
 import { asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql, SQL } from "drizzle-orm";
 import { z } from "zod";
 import { aiAssessments, feedback, sources, vacancies } from "./db/schema";
@@ -8,6 +9,7 @@ export const feedbackFilterValues = ["unreviewed", ...verdictFilterValues] as co
 export const aiFilterValues = ["unassessed", "promising", ...verdictFilterValues] as const;
 export const salaryFilterValues = ["known", "unknown"] as const;
 export const sortValues = ["newest", "deadline", "ai-score"] as const;
+export const PAGE_SIZE = 25;
 export const rejectedFilterValues = ["show"] as const;
 
 export type FeedbackFilter = (typeof feedbackFilterValues)[number];
@@ -17,6 +19,7 @@ export type SortOption = (typeof sortValues)[number];
 export type RejectedFilter = (typeof rejectedFilterValues)[number];
 
 export type VacancyListFilters = {
+  query?: string;
   city?: string;
   employer?: string;
   source?: string;
@@ -26,6 +29,7 @@ export type VacancyListFilters = {
   /** Alleen een expliciete keuze haalt afgewezen vacatures terug in beeld. */
   rejected?: RejectedFilter;
   sort: SortOption;
+  page?: number;
 };
 
 export type RawSearchParams = Record<string, string | string[] | undefined>;
@@ -41,6 +45,7 @@ const text = z.preprocess((value) => {
 const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) => text.pipe(z.enum(values).optional().catch(undefined));
 
 const searchParamsSchema = z.object({
+  query: text,
   city: text,
   employer: text,
   source: text,
@@ -49,14 +54,15 @@ const searchParamsSchema = z.object({
   ai: optionalEnum(aiFilterValues),
   rejected: optionalEnum(rejectedFilterValues),
   sort: text.pipe(z.enum(sortValues).catch("newest")),
+  page: z.preprocess((value) => Array.isArray(value) ? value[0] : value, z.coerce.number().int().positive().catch(1)),
 });
 
-const emptyFilters: VacancyListFilters = { city: undefined, employer: undefined, source: undefined, salary: undefined, feedback: undefined, ai: undefined, rejected: undefined, sort: "newest" };
+const emptyFilters: VacancyListFilters = { query: undefined, city: undefined, employer: undefined, source: undefined, salary: undefined, feedback: undefined, ai: undefined, rejected: undefined, sort: "newest", page: 1 };
 
 /** Faalt nooit: elke onbruikbare queryparameter levert "geen filter" op in plaats van een fout. */
 export function parseVacancyListFilters(params: RawSearchParams): VacancyListFilters {
   const result = searchParamsSchema.safeParse(params ?? {});
-  return result.success ? result.data : { ...emptyFilters };
+  return result.success ? { ...emptyFilters, ...result.data } : { ...emptyFilters };
 }
 
 /** Een bronslug die niet (meer) bestaat levert geen lege pagina op maar simpelweg geen bronfilter. */
@@ -72,16 +78,17 @@ export function showsRejected(filters: Pick<VacancyListFilters, "rejected" | "fe
   return filters.rejected === "show" || filters.feedback === rejectedVerdict;
 }
 
-export function buildVacancyListConditions(filters: VacancyListFilters): SQL[] {
+export function buildVacancyListConditions(filters: VacancyListFilters, currentFeedback: { id: AnyColumn; value: AnyColumn } = feedback): SQL[] {
   const conditions: SQL[] = [eq(vacancies.active, true)];
+  if (filters.query) conditions.push(or(ilike(vacancies.title, `%${filters.query}%`), ilike(vacancies.employer, `%${filters.query}%`), ilike(vacancies.description, `%${filters.query}%`), ilike(vacancies.originalText, `%${filters.query}%`))!);
   if (filters.city) conditions.push(ilike(vacancies.location, `%${filters.city}%`));
   if (filters.employer) conditions.push(ilike(vacancies.employer, `%${filters.employer}%`));
   if (filters.source) conditions.push(eq(sources.slug, filters.source));
   if (filters.salary === "known") conditions.push(isNotNull(vacancies.salaryMin));
   if (filters.salary === "unknown") conditions.push(isNull(vacancies.salaryMin));
-  if (filters.feedback === "unreviewed") conditions.push(isNull(feedback.id));
-  else if (filters.feedback) conditions.push(eq(feedback.value, filters.feedback));
-  if (!showsRejected(filters)) conditions.push(or(isNull(feedback.value), ne(feedback.value, rejectedVerdict))!);
+  if (filters.feedback === "unreviewed") conditions.push(isNull(currentFeedback.id));
+  else if (filters.feedback) conditions.push(eq(currentFeedback.value, filters.feedback));
+  if (!showsRejected(filters)) conditions.push(or(isNull(currentFeedback.value), ne(currentFeedback.value, rejectedVerdict))!);
   if (filters.ai === "unassessed") conditions.push(isNull(aiAssessments.id));
   else if (filters.ai === "promising") conditions.push(inArray(aiAssessments.verdict, promisingAiVerdicts));
   else if (filters.ai) conditions.push(eq(aiAssessments.verdict, filters.ai));

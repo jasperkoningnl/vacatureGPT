@@ -53,8 +53,8 @@ describe("dedupeVacancyRows", () => {
 
 describe("parseVacancyListFilters", () => {
   it("laat geldige filters ongewijzigd door", () => {
-    expect(parseVacancyListFilters({ city: "Amsterdam", employer: "NPO", source: "villamedia", salary: "known", feedback: "interesting", ai: "promising", sort: "ai-score" }))
-      .toEqual({ city: "Amsterdam", employer: "NPO", source: "villamedia", salary: "known", feedback: "interesting", ai: "promising", sort: "ai-score" });
+    expect(parseVacancyListFilters({ city: "Amsterdam", employer: "NPO", source: "villamedia", salary: "known", feedback: "interesting", ai: "promising", sort: "ai-score", page: "1" }))
+      .toEqual({ query: undefined, city: "Amsterdam", employer: "NPO", source: "villamedia", salary: "known", feedback: "interesting", ai: "promising", rejected: undefined, sort: "ai-score", page: 1 });
   });
 
   it("accepteert de bijzondere waarden unreviewed en unassessed", () => {
@@ -83,7 +83,7 @@ describe("parseVacancyListFilters", () => {
   });
 
   it("werkt zonder searchParams", () => {
-    expect(parseVacancyListFilters({})).toEqual({ city: undefined, employer: undefined, source: undefined, salary: undefined, feedback: undefined, ai: undefined, sort: "newest" });
+    expect(parseVacancyListFilters({})).toEqual({ city: undefined, employer: undefined, source: undefined, salary: undefined, feedback: undefined, ai: undefined, sort: "newest", query: undefined, page: 1 });
   });
 });
 
@@ -122,7 +122,7 @@ describe("/vacatures gebruikt de gevalideerde querylaag", () => {
   const page = readFileSync("app/vacatures/page.tsx", "utf8");
   it("bouwt de query met de gedeelde helpers en telt ontdubbelde vacatures", () => {
     expect(page).toContain("queryVacancyList(getDb(), await searchParams)");
-    expect(page).toContain("{items.length}");
+    expect(page).toContain("{total}");
     expect(page).not.toContain("as keyof typeof verdictLabels");
   });
   it("toont alle vindplaatsen van dezelfde vacature", () => {
@@ -133,7 +133,7 @@ describe("/vacatures gebruikt de gevalideerde querylaag", () => {
 describe("parseVacancyListFilters is crashbestendig", () => {
   it("valt terug op de standaardfilters bij onbruikbare invoer", () => {
     const filters = parseVacancyListFilters({ city: 42, feedback: { value: "interesting" } } as unknown as Record<string, string | string[] | undefined>);
-    expect(filters).toEqual({ city: undefined, employer: undefined, source: undefined, salary: undefined, feedback: undefined, ai: undefined, sort: "newest" });
+    expect(filters).toEqual({ city: undefined, employer: undefined, source: undefined, salary: undefined, feedback: undefined, ai: undefined, sort: "newest", query: undefined, page: 1 });
   });
 });
 
@@ -165,4 +165,10 @@ describe("afgewezen vacatures staan standaard buiten de lijst", () => {
     expect(parseVacancyListFilters({ rejected: "true" }).rejected).toBeUndefined();
     expect(parseVacancyListFilters({ rejected: "'; drop table feedback; --" }).rejected).toBeUndefined();
   });
+});
+
+
+describe("vrije tekstzoek en paginering", () => {
+  it("valideert zoektekst en positieve paginanummers", () => { expect(parseVacancyListFilters({ query: "  hoofdredacteur ", page: "3" })).toMatchObject({ query: "hoofdredacteur", page: 3 }); expect(parseVacancyListFilters({ page: "-1" }).page).toBe(1); });
+  it("zoekt in titel, werkgever, beschrijving en oorspronkelijke tekst", () => { const query=toSql({ query: "cultuur" }); expect(query.sql.match(/ilike/g)).toHaveLength(4); expect(query.params.filter((x) => x === "%cultuur%")).toHaveLength(4); });
 });

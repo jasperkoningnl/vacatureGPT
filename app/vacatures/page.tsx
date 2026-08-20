@@ -10,10 +10,11 @@ import { formatDate } from "@/lib/date-format";
 export const dynamic = "force-dynamic";
 
 export default async function Page({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
-  const { sourceOptions, filters: q, items, rejectedCount } = await queryVacancyList(getDb(), await searchParams);
+  const { sourceOptions, filters: q, items, total, pageCount, rejectedCount } = await queryVacancyList(getDb(), await searchParams);
   const rejectedVisible = showsRejected(q);
 
-  return <><div className="page-title"><div><p className="eyebrow">Beheer · volledige vacaturelijst</p><h1>Alle vacatures</h1></div><span className="muted">{items.length} {items.length === 1 ? "vacature" : "vacatures"}</span></div><form className="filters">
+  return <><div className="page-title"><div><p className="eyebrow">Beheer · volledige vacaturelijst</p><h1>Alle vacatures</h1></div><span className="muted">{total} {total === 1 ? "vacature" : "vacatures"}</span></div><form className="filters">
+    <label className="filter-field"><span>Zoeken</span><input name="query" type="search" placeholder="Titel, werkgever of vacaturetekst" defaultValue={q.query}/></label>
     <label className="filter-field"><span>Stad</span><input name="city" placeholder="Bijv. Utrecht" defaultValue={q.city}/></label>
     <label className="filter-field"><span>Werkgever</span><input name="employer" placeholder="Bijv. NPO" defaultValue={q.employer}/></label>
     <label className="filter-field"><span>Bron</span><select name="source" defaultValue={q.source ?? ""}><option value="">Alle bronnen</option>{sourceOptions.map(x=><option key={x.slug} value={x.slug}>{x.name}</option>)}</select></label>
@@ -37,5 +38,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<Raw
     <td>{r.salaryMin ? `€ ${r.salaryMin.toLocaleString("nl-NL")}${r.salaryMax ? `–${r.salaryMax.toLocaleString("nl-NL")}` : ""}` : (r.salaryOriginal ? "Niet gekwantificeerd" : "Niet vermeld")}</td>
     <td>{r.deadline ? formatDate(r.deadline) : "Niet vermeld"}</td>
     <td><div className="source-links">{r.occurrences.map((occurrence) => <a key={`${occurrence.source}-${occurrence.url}`} href={occurrence.url} target="_blank" rel="noreferrer">{occurrence.source} ↗</a>)}</div></td>
-  </tr>)}</tbody></table></div>{!items.length && <p className="muted">Geen vacatures binnen deze filters.</p>}</>;
+  </tr>)}</tbody></table></div><nav className="pagination" aria-label="Paginering">{q.page > 1 && <Link href={`/vacatures?${new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, value]) => value !== undefined).map(([key,value]) => [key,String(value)])), page:String(q.page-1) })}`}>← Vorige</Link>}<span>Pagina {q.page} van {pageCount}</span>{q.page < pageCount && <Link href={`/vacatures?${new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, value]) => value !== undefined).map(([key,value]) => [key,String(value)])), page:String(q.page+1) })}`}>Volgende →</Link>}</nav>{!items.length && <p className="muted">Geen vacatures binnen deze filters.</p>}</>;
 }

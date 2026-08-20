@@ -119,6 +119,7 @@ describe("migration journal", () => {
       "0005_weekly_email_digest",
       "0006_vacancy_tracking",
       "0007_source_run_skipped",
+      "0008_candidate_context_feedback_history",
     ]);
   });
 

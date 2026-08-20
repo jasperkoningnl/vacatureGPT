@@ -2,7 +2,8 @@ import { appendFile } from "node:fs/promises";
 import OpenAI from "openai";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../lib/db";
-import { aiAssessments, feedback, preferences, vacancies, watchedEmployers } from "../lib/db/schema";
+import { latestFeedbackPerVacancy } from "../lib/db/latest-feedback";
+import { aiAssessments, preferences, vacancies, watchedEmployers } from "../lib/db/schema";
 import { assessVacancy, ASSESSMENT_CONFIG } from "../lib/ai/vacancy-assessment";
 import { buildAssessmentProfile, hashProfile } from "../lib/ai/profile";
 import { buildCalibrationContext } from "../lib/ai/calibration-context";
@@ -25,6 +26,7 @@ if (!preference) throw new Error("Geen preferences-rij gevonden; voer eerst de b
 const employerRows = await db.select({ name: watchedEmployers.name }).from(watchedEmployers).where(eq(watchedEmployers.enabled, true));
 const profile = buildAssessmentProfile(preference, employerRows.map(({ name }) => name));
 const profileHash = hashProfile(profile);
+const feedback = latestFeedbackPerVacancy(db);
 const calibrationRows = await db.select({
   id: feedback.id, learningEligible: feedback.learningEligible, aiVerdict: feedback.aiVerdict,
   userVerdict: feedback.value, reasonCode: feedback.reasonCode, note: feedback.note,
