@@ -21,17 +21,22 @@ export type FeedResult = {
   fatalError?: string;
 };
 
+export async function readDiscoverySource(
+  source: typeof DISCOVERY_SOURCES[number],
+  reader: (path: string) => ReturnType<typeof readDiscoveryFeed> = (path) => readDiscoveryFeed(path),
+): Promise<FeedResult> {
+  try {
+    const feed = await reader(source.path);
+    return { source, found: feed.postingsFound, vacancies: feed.vacancies, errors: feed.errors };
+  } catch (error) {
+    return { source, found: 0, vacancies: [], errors: [], fatalError: error instanceof Error ? error.message : "Onbekende feedfout" };
+  }
+}
+
 export async function readDiscoveryFeeds(
   reader: (path: string) => ReturnType<typeof readDiscoveryFeed> = (path) => readDiscoveryFeed(path),
 ): Promise<FeedResult[]> {
-  return Promise.all(DISCOVERY_SOURCES.map(async (source) => {
-    try {
-      const feed = await reader(source.path);
-      return { source, found: feed.postingsFound, vacancies: feed.vacancies, errors: feed.errors };
-    } catch (error) {
-      return { source, found: 0, vacancies: [], errors: [], fatalError: error instanceof Error ? error.message : "Onbekende feedfout" };
-    }
-  }));
+  return Promise.all(DISCOVERY_SOURCES.map((source) => readDiscoverySource(source, reader)));
 }
 
 export type ExistingDiscoveryVacancy = { id: number; employer: string; title: string };

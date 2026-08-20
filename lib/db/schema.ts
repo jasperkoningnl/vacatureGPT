@@ -1,6 +1,6 @@
 import { boolean, index, integer, jsonb, pgEnum, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
-export const runStatus = pgEnum("run_status", ["running", "success", "warning", "error"]);
+export const runStatus = pgEnum("run_status", ["running", "success", "warning", "error", "skipped"]);
 export const feedbackValue = pgEnum("feedback_value", ["interesting", "maybe", "not_suitable"]);
 export const emailDigestStatus = pgEnum("email_digest_status", ["pending", "sent", "failed"]);
 export const applicationStatus = pgEnum("application_status", ["want_to_apply", "applied", "interview", "rejected", "no_longer_interested"]);
