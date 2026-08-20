@@ -1,38 +1,13 @@
-import { and, eq } from "drizzle-orm";
-import { appendFile } from "node:fs/promises";
+import { eq } from "drizzle-orm";
 import { getDb } from "../lib/db";
-import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
-import { expireKnownGoneUrls, recomputeVacancyActivity, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
+import { vacancies, vacancyOccurrences } from "../lib/db/schema";
+import { expireKnownGoneUrls, recomputeVacancyActivity } from "../lib/vacancy-lifecycle";
 import { fetchOneWorld, fetchOneWorldUrls, matchRepairOccurrence, repairFailureReason, type NormalizedVacancy } from "../lib/ingestion/oneworld-parser";
-import { createIngestionWarning, runStatusForWarnings, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
+import { createIngestionWarning, runStatusForWarnings } from "../lib/ingestion/shared/ingestion-warnings";
+import { runIngestSource, upsertIngestVacancy } from "../lib/ingestion/ingest-runner";
 
 const db = getDb();
-const [source] = await db.select().from(sources).where(eq(sources.slug, "oneworld"));
-if (!source) throw new Error("Voer eerst pnpm db:seed uit");
-const [run] = await db.insert(sourceRuns).values({ sourceId: source.id }).returning();
 const isRepair = process.argv.includes("--repair");
-
-async function writeSummary(values: { requested: number; parsed: number; updated: number; unchanged: number; failed: number; duplicates: number; added: number; warnings: string[] }) {
-  const lines = [
-    "## OneWorld repair summary",
-    "",
-    "| Result | Count |",
-    "| --- | ---: |",
-    `| Requested URLs | ${values.requested} |`,
-    `| Parsed pages | ${values.parsed} |`,
-    `| Updated | ${values.updated} |`,
-    `| Unchanged | ${values.unchanged} |`,
-    `| Failed | ${values.failed} |`,
-    `| Duplicates prevented | ${values.duplicates} |`,
-    `| Newly imported | ${values.added} |`,
-    "",
-    warningsMarkdown(values.warnings),
-    "",
-  ];
-  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"), "utf8");
-  console.log(`OneWorld summary: requested=${values.requested}, parsed=${values.parsed}, updated=${values.updated}, unchanged=${values.unchanged}, failed=${values.failed}, duplicates=${values.duplicates}, added=${values.added}`);
-  for (const warning of values.warnings) console.warn(`OneWorld warning: ${warning}`);
-}
 
 function vacancyValues(item: NormalizedVacancy) {
   return {
@@ -56,7 +31,7 @@ function vacancyValues(item: NormalizedVacancy) {
   };
 }
 
-try {
+await runIngestSource({ slug: "oneworld", name: "OneWorld", baseUrl: "https://www.oneworld.nl" }, async ({ source, run }) => {
   const repairOccurrences = isRepair ? await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences })
     .from(vacancyOccurrences).innerJoin(vacancies, eq(vacancyOccurrences.vacancyId, vacancies.id))
     .where(eq(vacancyOccurrences.sourceId, source.id)) : [];
@@ -69,8 +44,6 @@ try {
   // Validate the complete batch before changing any vacancy or occurrence.
   if (repairFailure) {
     warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `${repairFailure} Er zijn geen vacatures gewijzigd.` }));
-    await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: results.length, warnings, error: `${repairFailure} Er zijn geen vacatures gewijzigd.` }).where(eq(sourceRuns.id, run.id));
-    await writeSummary({ requested: requestedCount, parsed: results.length, updated: 0, unchanged: 0, failed: failedCount, duplicates: repairUrls.length - requestedCount, added: 0, warnings });
     throw new Error("OneWorld-reparatie afgebroken vóór databasewijzigingen. Bekijk het workflowoverzicht.");
   }
   let added = 0;
@@ -92,43 +65,10 @@ try {
       await recomputeVacancyActivity([existing.vacancy.id]);
       continue;
     }
-    // Identity is deliberately resolved before canonical data: corrected employer/title must
-    // repair the vacancy attached to the source occurrence rather than create a duplicate.
-    const [byExternalId] = item.externalId ? await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences })
-      .from(vacancyOccurrences).innerJoin(vacancies, eq(vacancyOccurrences.vacancyId, vacancies.id))
-      .where(and(eq(vacancyOccurrences.sourceId, source.id), eq(vacancyOccurrences.externalId, item.externalId))).limit(1) : [];
-    const [byUrl] = byExternalId ? [] : await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences })
-      .from(vacancyOccurrences).innerJoin(vacancies, eq(vacancyOccurrences.vacancyId, vacancies.id))
-      .where(and(eq(vacancyOccurrences.sourceId, source.id), eq(vacancyOccurrences.sourceUrl, item.sourceUrl))).limit(1);
-    const [byCanonical] = byExternalId || byUrl ? [] : await db.select().from(vacancies)
-      .where(eq(vacancies.canonicalKey, item.canonicalKey)).limit(1);
-    const old = byExternalId?.vacancy ?? byUrl?.vacancy ?? byCanonical;
-    if (byCanonical) duplicates++;
-    let vacancyId: number;
-    if (!old) {
-      const [created] = await db.insert(vacancies).values(vacancyValues(item)).returning({ id: vacancies.id });
-      vacancyId = created.id;
-      added++;
-    } else {
-      vacancyId = old.id;
-      if (old.contentHash !== item.contentHash || old.canonicalKey !== item.canonicalKey) changed++;
-      else unchanged++;
-      await db.update(vacancies).set({ ...vacancyValues(item), lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(vacancies.id, old.id));
-    }
-
-    const occurrence = byExternalId?.occurrence ?? byUrl?.occurrence;
-    if (occurrence) {
-      await db.update(vacancyOccurrences).set({ active: true, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
-    } else {
-      await db.insert(vacancyOccurrences).values({ active: true, vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
-        .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active: true, vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
-    }
-    await recomputeVacancyActivity([vacancyId]);
+    const result = await upsertIngestVacancy({ sourceId: source.id, runId: run.id, item, values: vacancyValues(item), refreshUnchanged: true });
+    if (result.outcome === "added") added++; else if (result.outcome === "updated") changed++; else unchanged++;
+    if (result.duplicate) duplicates++;
   }
-  if (!isRepair && fetched.failedCount === 0) await reconcileSuccessfulSourceRun(source.id, run.id);
-  await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: results.length, newCount: added, changedCount: changed, warnings }).where(eq(sourceRuns.id, run.id));
-  await writeSummary({ requested: requestedCount, parsed: results.length, updated: changed, unchanged, failed: failedCount, duplicates, added, warnings });
-} catch (error) {
-  await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), error: error instanceof Error ? error.message : "Onbekende fout" }).where(eq(sourceRuns.id, run.id));
-  throw error;
-}
+  return { resultCount: results.length, newCount: added, changedCount: changed, unchanged, duplicates, failed: failedCount, warnings,
+    trustworthy: !isRepair && fetched.failedCount === 0, status: runStatusForWarnings(warnings), summaryRows: [["Requested URLs", requestedCount], ["Parsed pages", results.length], ["Updated", changed], ["Unchanged", unchanged], ["Failed", failedCount], ["Duplicates prevented", duplicates], ["Newly imported", added]] };
+});

@@ -1,68 +1,26 @@
-import { and, eq } from "drizzle-orm";
-import { appendFile } from "node:fs/promises";
-import { getDb } from "../lib/db";
-import { sources, sourceRuns, vacancies, vacancyOccurrences } from "../lib/db/schema";
-import { activeForDiscoveredOccurrence, expireKnownGoneUrls, recomputeVacancyActivity, reconcileSuccessfulSourceRun } from "../lib/vacancy-lifecycle";
+import { activeForDiscoveredOccurrence, expireKnownGoneUrls } from "../lib/vacancy-lifecycle";
 import { batchFailureReason, fetchVillamedia, type VillamediaVacancy, VILLAMEDIA_BASE_URL } from "../lib/ingestion/villamedia-parser";
-import { createIngestionWarning, parseIngestionWarning, runStatusForWarnings, warningsMarkdown } from "../lib/ingestion/shared/ingestion-warnings";
+import { createIngestionWarning, parseIngestionWarning, runStatusForWarnings } from "../lib/ingestion/shared/ingestion-warnings";
+import { runIngestSource, upsertIngestVacancy } from "../lib/ingestion/ingest-runner";
 
-const db = getDb();
-const [source] = await db.insert(sources).values({ slug: "villamedia", name: "Villamedia", baseUrl: VILLAMEDIA_BASE_URL, enabled: true })
-  .onConflictDoUpdate({ target: sources.slug, set: { name: "Villamedia", baseUrl: VILLAMEDIA_BASE_URL, enabled: true } }).returning();
-const [run] = await db.insert(sourceRuns).values({ sourceId: source.id }).returning();
-
-function vacancyValues(item: VillamediaVacancy) {
+function values(item: VillamediaVacancy) {
   return { canonicalKey: item.canonicalKey, title: item.title, employer: item.employer, location: item.location, hoursMin: item.hoursMin, hoursMax: item.hoursMax,
     hoursOriginal: item.hoursOriginal, salaryMin: item.salaryMin, salaryMax: item.salaryMax, salaryPeriod: item.salaryPeriod, salaryBasisHours: item.salaryBasisHours,
     salaryOriginal: item.salaryOriginal, deadline: item.deadline, description: item.originalText, originalText: item.originalText, contentHash: item.contentHash, active: !item.isStage };
 }
-async function summary(values: { pages: number; discovered: number; parsed: number; added: number; updated: number; unchanged: number; duplicates: number; failed: number; warnings: string[] }) {
-  const lines = ["## Villamedia ingestion summary", "", "| Result | Count |", "| --- | ---: |", `| Overview pages fetched | ${values.pages} |`,
-    `| Unique vacancy URLs discovered | ${values.discovered} |`, `| Parsed | ${values.parsed} |`, `| Added | ${values.added} |`, `| Updated | ${values.updated} |`,
-    `| Unchanged | ${values.unchanged} |`, `| Duplicates prevented | ${values.duplicates} |`, `| Failed | ${values.failed} |`, `| Warnings | ${values.warnings.length} |`, "",
-    warningsMarkdown(values.warnings), ""];
-  console.log(`Villamedia summary: pages=${values.pages}, discovered=${values.discovered}, parsed=${values.parsed}, added=${values.added}, updated=${values.updated}, unchanged=${values.unchanged}, duplicates=${values.duplicates}, failed=${values.failed}, warnings=${values.warnings.length}`);
-  values.warnings.forEach((warning) => console.warn(`Villamedia warning: ${warning}`));
-  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"), "utf8");
-}
 
-let fetched: Awaited<ReturnType<typeof fetchVillamedia>> | undefined;
-try {
-  fetched = await fetchVillamedia();
+await runIngestSource({ slug: "villamedia", name: "Villamedia", baseUrl: VILLAMEDIA_BASE_URL }, async ({ source, run }) => {
+  const fetched = await fetchVillamedia();
   await expireKnownGoneUrls(source.id, fetched.goneUrls);
   const warnings = [...fetched.warnings, ...fetched.results.flatMap((item) => item.warnings.map((warning) => createIngestionWarning({ ...parseIngestionWarning(warning), url: item.sourceUrl })))];
   const failure = batchFailureReason(fetched.entries.length, fetched.results, fetched.failedCount);
-  if (failure) {
-    warnings.push(createIngestionWarning({ severity: "critical", category: "batch", message: `${failure} Er zijn geen vacatures bijgewerkt.` }));
-  await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), resultCount: fetched.results.length, warnings, error: `${failure} Geen vacaturewrites uitgevoerd.` }).where(eq(sourceRuns.id, run.id));
-    await summary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added: 0, updated: 0, unchanged: 0, duplicates: 0, failed: fetched.failedCount, warnings });
-    throw new Error("Villamedia-ingestie afgebroken vóór vacaturewrites.");
-  }
+  if (failure) throw new Error(`${failure} Geen vacaturewrites uitgevoerd.`);
   let added = 0; let updated = 0; let unchanged = 0; let duplicates = 0;
   for (const item of fetched.results) {
-    const [byExternal] = item.externalId ? await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences }).from(vacancyOccurrences)
-      .innerJoin(vacancies, eq(vacancyOccurrences.vacancyId, vacancies.id)).where(and(eq(vacancyOccurrences.sourceId, source.id), eq(vacancyOccurrences.externalId, item.externalId))).limit(1) : [];
-    const [byUrl] = byExternal ? [] : await db.select({ vacancy: vacancies, occurrence: vacancyOccurrences }).from(vacancyOccurrences)
-      .innerJoin(vacancies, eq(vacancyOccurrences.vacancyId, vacancies.id)).where(and(eq(vacancyOccurrences.sourceId, source.id), eq(vacancyOccurrences.sourceUrl, item.sourceUrl))).limit(1);
-    const [byCanonical] = byExternal || byUrl ? [] : await db.select().from(vacancies).where(eq(vacancies.canonicalKey, item.canonicalKey)).limit(1);
-    const old = byExternal?.vacancy ?? byUrl?.vacancy ?? byCanonical;
-    if (byCanonical) duplicates++;
-    let vacancyId: number;
-    if (!old) { const [created] = await db.insert(vacancies).values(vacancyValues(item)).returning({ id: vacancies.id }); vacancyId = created.id; added++; }
-    else { vacancyId = old.id; if (old.contentHash === item.contentHash && old.canonicalKey === item.canonicalKey) unchanged++; else updated++;
-      await db.update(vacancies).set({ ...vacancyValues(item), lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(vacancies.id, vacancyId)); }
-    const occurrence = byExternal?.occurrence ?? byUrl?.occurrence;
-    const occurrenceActive = activeForDiscoveredOccurrence(item);
-    if (occurrence) await db.update(vacancyOccurrences).set({ active: occurrenceActive, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, lastSeenAt: new Date(), rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
-    else await db.insert(vacancyOccurrences).values({ active: occurrenceActive, vacancyId, sourceId: source.id, sourceRunId: run.id, externalId: item.externalId, sourceUrl: item.sourceUrl, rawData: item.rawData })
-      .onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { active: occurrenceActive, vacancyId, sourceRunId: run.id, externalId: item.externalId, lastSeenAt: new Date(), rawData: item.rawData } });
-
-    await recomputeVacancyActivity([vacancyId]);
+    const result = await upsertIngestVacancy({ sourceId: source.id, runId: run.id, item, values: values(item), active: activeForDiscoveredOccurrence(item), refreshUnchanged: true });
+    if (result.outcome === "added") added++; else if (result.outcome === "updated") updated++; else unchanged++;
+    if (result.duplicate) duplicates++;
   }
-  if (fetched.failedCount === 0) await reconcileSuccessfulSourceRun(source.id, run.id);
-  await db.update(sourceRuns).set({ status: runStatusForWarnings(warnings), finishedAt: new Date(), resultCount: fetched.results.length, newCount: added, changedCount: updated, warnings }).where(eq(sourceRuns.id, run.id));
-  await summary({ pages: fetched.overviewPagesFetched, discovered: fetched.entries.length, parsed: fetched.results.length, added, updated, unchanged, duplicates, failed: fetched.failedCount, warnings });
-} catch (error) {
-  await db.update(sourceRuns).set({ status: "error", finishedAt: new Date(), error: error instanceof Error ? error.message : "Onbekende fout" }).where(eq(sourceRuns.id, run.id));
-  throw error;
-}
+  return { resultCount: fetched.results.length, newCount: added, changedCount: updated, unchanged, duplicates, failed: fetched.failedCount, warnings,
+    trustworthy: fetched.failedCount === 0, status: runStatusForWarnings(warnings), summaryRows: [["Overview pages fetched", fetched.overviewPagesFetched], ["Unique vacancy URLs discovered", fetched.entries.length], ["Parsed", fetched.results.length], ["Added", added], ["Updated", updated], ["Unchanged", unchanged], ["Duplicates prevented", duplicates], ["Failed", fetched.failedCount], ["Warnings", warnings.length]] };
+});

@@ -108,7 +108,7 @@ describe("vacancy tracking migration", () => {
 });
 
 describe("migration journal", () => {
-  it("registers the recovery chain in 0004 -> 0005 -> 0006 order", () => {
+  it("registers the recovery chain through the skipped-run migration in order", () => {
     const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as {
       entries: Array<{ idx: number; tag: string }>;
     };
@@ -118,6 +118,7 @@ describe("migration journal", () => {
       "0004_feedback_learning_eligible",
       "0005_weekly_email_digest",
       "0006_vacancy_tracking",
+      "0007_source_run_skipped",
     ]);
   });
 });
