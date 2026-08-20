@@ -4,6 +4,7 @@ import { getDb } from "../db";
 import { sourceRuns, sources, vacancies, vacancyOccurrences } from "../db/schema";
 import { recomputeVacancyActivity, reconcileSuccessfulSourceRun } from "../vacancy-lifecycle";
 import { warningsMarkdown } from "./shared/ingestion-warnings";
+import { type Database } from "../db/application-queries";
 
 export type SourceDefinition = { slug: string; name: string; baseUrl: string };
 export type IngestCounts = { resultCount: number; newCount: number; changedCount: number; unchanged?: number; duplicates?: number; failed?: number };
@@ -19,17 +20,17 @@ export type RunnerStore = {
   appendSummary(text: string): Promise<void>;
 };
 
-const databaseStore: RunnerStore = {
+export function createDatabaseRunnerStore(db: Database): RunnerStore { return {
   async ensureSource(definition) {
-    const [source] = await getDb().insert(sources).values(definition)
+    const [source] = await db.insert(sources).values(definition)
       .onConflictDoUpdate({ target: sources.slug, set: { name: definition.name, baseUrl: definition.baseUrl } }).returning();
     return source;
   },
-  async createRun(sourceId) { const [run] = await getDb().insert(sourceRuns).values({ sourceId }).returning(); return run; },
-  async finishRun(runId, values) { await getDb().update(sourceRuns).set(values).where(eq(sourceRuns.id, runId)); },
+  async createRun(sourceId) { const [run] = await db.insert(sourceRuns).values({ sourceId }).returning(); return run; },
+  async finishRun(runId, values) { await db.update(sourceRuns).set(values).where(eq(sourceRuns.id, runId)); },
   reconcile: reconcileSuccessfulSourceRun,
   async appendSummary(text) { if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `${text}\n`, "utf8"); },
-};
+}; }
 
 function summary(definition: SourceDefinition, status: string, result?: IngestResult) {
   const rows = result?.summaryRows ?? [
@@ -40,7 +41,7 @@ function summary(definition: SourceDefinition, status: string, result?: IngestRe
     "| Result | Count |", "| --- | ---: |", ...rows.map(([label, count]) => `| ${label} | ${count} |`), "", warningsMarkdown(result?.warnings ?? []), ""].join("\n");
 }
 
-export async function runIngestSource(definition: SourceDefinition, ingest: (context: { source: Source; run: Run }) => Promise<IngestResult>, store: RunnerStore = databaseStore) {
+export async function runIngestSource(definition: SourceDefinition, ingest: (context: { source: Source; run: Run }) => Promise<IngestResult>, store: RunnerStore = createDatabaseRunnerStore(getDb())) {
   const source = await store.ensureSource(definition);
   const run = await store.createRun(source.id);
   if (!source.enabled) {

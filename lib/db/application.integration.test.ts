@@ -1,0 +1,106 @@
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
+import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import * as schema from "./schema";
+import { feedback, sourceRuns, sources, vacancies, vacancyOccurrences } from "./schema";
+import { type Database, queryVacancyList, setSourceEnabled } from "./application-queries";
+import { storeFeedback } from "./feedback";
+import { createDatabaseRunnerStore, runIngestSource } from "../ingestion/ingest-runner";
+
+describe("database- en actionlaag", () => {
+  let client: PGlite;
+  let db: Database;
+
+  beforeAll(async () => {
+    client = new PGlite();
+    const testDb = drizzle(client, { schema });
+    await migrate(testDb, { migrationsFolder: "drizzle" });
+    db = testDb as unknown as Database;
+  }, 30_000);
+
+  beforeEach(async () => {
+    await client.exec("TRUNCATE feedback, ai_assessments, source_runs, vacancy_occurrences, vacancies, sources RESTART IDENTITY CASCADE");
+  });
+
+  afterAll(async () => client.close());
+
+  async function source(slug: string, enabled = true) {
+    const [result] = await db.insert(sources).values({ slug, name: slug, baseUrl: `https://${slug}.example`, enabled }).returning();
+    return result;
+  }
+
+  async function vacancy(canonicalKey: string, values: Partial<typeof vacancies.$inferInsert> = {}) {
+    const [result] = await db.insert(vacancies).values({
+      canonicalKey, title: canonicalKey, employer: "NPO", location: "Amsterdam", originalText: canonicalKey, contentHash: canonicalKey,
+      ...values,
+    }).returning();
+    return result;
+  }
+
+  it("draait de echte migratieketen en geeft vacatures met meerdere occurrences één keer terug", async () => {
+    const firstSource = await source("villamedia");
+    const secondSource = await source("oneworld");
+    const item = await vacancy("redacteur");
+    await db.insert(vacancyOccurrences).values([
+      { vacancyId: item.id, sourceId: firstSource.id, sourceUrl: "https://villamedia.example/1", rawData: {} },
+      { vacancyId: item.id, sourceId: secondSource.id, sourceUrl: "https://oneworld.example/1", rawData: {} },
+    ]);
+
+    const result = await queryVacancyList(db, {});
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].occurrences).toEqual([
+      { source: "villamedia", url: "https://villamedia.example/1" },
+      { source: "oneworld", url: "https://oneworld.example/1" },
+    ]);
+  });
+
+  it("past geldige filters in de query toe en laat ongeldige enum- en bronfilters veilig vallen", async () => {
+    const knownSource = await source("villamedia");
+    const matching = await vacancy("match", { salaryMin: 4000 });
+    const other = await vacancy("other", { location: "Utrecht" });
+    await db.insert(vacancyOccurrences).values([
+      { vacancyId: matching.id, sourceId: knownSource.id, sourceUrl: "https://villamedia.example/match", rawData: {} },
+      { vacancyId: other.id, sourceId: knownSource.id, sourceUrl: "https://villamedia.example/other", rawData: {} },
+    ]);
+
+    const filtered = await queryVacancyList(db, { city: "Amsterdam", salary: "known", source: "villamedia" });
+    const invalid = await queryVacancyList(db, { feedback: "kapot", ai: "'; drop table vacancies; --", source: "onbekend" });
+
+    expect(filtered.items.map(({ id }) => id)).toEqual([matching.id]);
+    expect(invalid.items).toHaveLength(2);
+    expect(invalid.filters).toMatchObject({ feedback: undefined, ai: undefined, source: undefined });
+  });
+
+  it("slaat feedback via de gebruikte upsert op en werkt dezelfde vacature bij", async () => {
+    const item = await vacancy("feedback");
+
+    await storeFeedback(db, { vacancyId: item.id, value: "maybe", note: "Eerst" });
+    await storeFeedback(db, { vacancyId: item.id, value: "interesting", note: "Daarna" });
+
+    const rows = await db.select().from(feedback).where(eq(feedback.vacancyId, item.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ value: "interesting", note: "Daarna", learningEligible: true });
+  });
+
+  it("bewaart enabled en slaat ingest daadwerkelijk over voor een uitgeschakelde bron", async () => {
+    const storedSource = await source("disabled");
+    await setSourceEnabled(db, storedSource.id, false);
+    const ingest = vi.fn();
+
+    const result = await runIngestSource(
+      { slug: "disabled", name: "disabled", baseUrl: "https://disabled.example" },
+      ingest,
+      createDatabaseRunnerStore(db),
+    );
+
+    const [savedSource] = await db.select().from(sources).where(eq(sources.id, storedSource.id));
+    const [run] = await db.select().from(sourceRuns).where(eq(sourceRuns.sourceId, storedSource.id));
+    expect(savedSource.enabled).toBe(false);
+    expect(run.status).toBe("skipped");
+    expect(ingest).not.toHaveBeenCalled();
+    expect(result.status).toBe("skipped");
+  });
+});
