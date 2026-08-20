@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { METADATA_ONLY_ASSESSMENT_NOTICE, METADATA_ONLY_BADGE, METADATA_ONLY_TEXT_NOTICE, isMetadataOnly } from "@/lib/vacancy-depth";
 import { VacancyContent } from "./vacancy-content";
 
 export type VacancyDetailData = {
@@ -23,6 +24,8 @@ export function VacancyReviewDetail({ vacancy, review, assessment, concealAssess
   vacancy: VacancyDetailData; review: ReactNode; assessment?: AssessmentData | null; concealAssessment?: boolean;
   sourceUrl?: string | null; sourceName?: string | null; backLink?: { href: string; label: string }; tracking?: ReactNode;
 }) {
+  // Een vacature zonder volledige tekst wordt overal als zodanig gemarkeerd, ook wanneer de AI-beoordeling nog verborgen is.
+  const metadataOnly = isMetadataOnly(vacancy);
   return <article className="vacancy-detail">
     <header className="vacancy-detail-header">
       {backLink && <Link className="back-link" href={backLink.href}>← {backLink.label}</Link>}
@@ -50,6 +53,7 @@ export function VacancyReviewDetail({ vacancy, review, assessment, concealAssess
     </section>
     <section className="detail-section ai-assessment panel" aria-labelledby="ai-title">
       <p className="eyebrow">AI-advies · los van jouw beoordeling</p><h2 id="ai-title">AI-beoordeling</h2>
+      {metadataOnly && <p className="depth-notice" role="note"><strong>{METADATA_ONLY_BADGE}.</strong> {METADATA_ONLY_ASSESSMENT_NOTICE}</p>}
       {concealAssessment ? <p className="muted">AI-beoordeling wordt zichtbaar nadat je zelf hebt beoordeeld</p> : assessment ? <>
         <div className="ai-verdict"><strong>{verdictLabels[assessment.verdict]}</strong><span>{assessment.score}/100</span></div>
         <p className="ai-summary">{assessment.summary}</p><div className="ai-points">
@@ -57,6 +61,6 @@ export function VacancyReviewDetail({ vacancy, review, assessment, concealAssess
           <div><h3>Aandachtspunten</h3>{assessment.concerns.length ? <ul>{assessment.concerns.map(item => <li key={item}>{item}</li>)}</ul> : <p className="muted">Geen aandachtspunten vermeld.</p>}</div>
         </div></> : <p className="muted">Voor deze vacature is nog geen AI-beoordeling beschikbaar.</p>}
     </section>
-    <section className="vacancy-text-section" aria-labelledby="vacancy-text-title"><p className="eyebrow">Volledige beschrijving</p><h2 id="vacancy-text-title">Vacaturetekst</h2><VacancyContent text={vacancy.originalText}/></section>
+    <section className="vacancy-text-section" aria-labelledby="vacancy-text-title"><p className="eyebrow">{metadataOnly ? "Alleen metadata uit de feed" : "Volledige beschrijving"}</p><h2 id="vacancy-text-title">Vacaturetekst</h2>{metadataOnly && <p className="depth-notice" role="note">{METADATA_ONLY_TEXT_NOTICE}</p>}<VacancyContent text={vacancy.originalText}/></section>
   </article>;
 }

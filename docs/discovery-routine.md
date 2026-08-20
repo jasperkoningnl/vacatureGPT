@@ -86,6 +86,32 @@ Deze routine schrijft naar `data/discovery/chatgpt/` volgens dezelfde afspraken 
 hetzelfde schema. Haar configuratie staat buiten deze repository en wordt bij de
 Codex-routine zelf beheerd.
 
+## Metadata-only vacatures en verrijking
+
+Een discovery-posting bevat alleen metadata: titel, werkgever, plaats, remote policy, uren,
+salaris, datum en bron. Dat is geen vacaturetekst, en een AI-oordeel daarop is minder
+betrouwbaar dan een oordeel op een geparste vacature. De importer maakt dat verschil
+expliciet in plaats van het te verbergen.
+
+- **Ophalen waar het veilig kan.** Wijst de posting een `direct_url` aan naar de
+  vacaturepagina bij de werkgever zelf, dan haalt `lib/ingestion/discovery-enrichment.ts` die
+  pagina op en gebruikt de leesbare tekst als vacaturetekst. Alleen https, alleen een URL die
+  naar één specifieke vacature wijst, met time-out en groottelimiet. LinkedIn, Indeed,
+  Glassdoor en sociale platformen worden nooit zelf geopend of gescrapet — ook niet via een
+  doorverwijzing. Mislukt het ophalen, dan blijft de vacature ongewijzigd metadata-only; dat
+  is een normale uitkomst en geen pipelinewaarschuwing.
+- **Diepte is afleidbaar, niet apart opgeslagen.** `lib/vacancy-depth.ts` bepaalt uit de
+  vacaturetekst zelf of een vacature `full` of `metadata_only` is. Er is dus geen migratie
+  nodig, en een later alsnog opgehaalde tekst verandert de classificatie vanzelf.
+- **De prompt weet het.** De vacature gaat met `contentDepth` de prompt in; bij
+  `metadata_only` mag het model geen taken of eisen aannemen die er niet staan en moet het de
+  beperking in de samenvatting benoemen. Het oordeel wordt bovendien nooit hoger dan
+  *Misschien*, hoe hoog de score ook uitvalt.
+- **De UI zegt het.** Detailpagina, kalibratieflow en de vacaturelijst tonen bij zo'n vacature
+  expliciet dat alleen metadata bekend is.
+- **De leerloop blijft schoon.** Een oordeel over een metadata-only vacature telt niet mee als
+  kalibratievoorbeeld in `buildCalibrationContext`.
+
 ## De importer
 
 `scripts/ingest-discovery.ts` leest de feed via de GitHub Contents API vanaf `main`.

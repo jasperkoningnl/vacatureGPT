@@ -66,7 +66,7 @@ describe("multi-source discovery import", () => {
 
   it("keeps a newly planned vacancy eligible for normal AI assessment", () => {
     const [planned] = planDiscoveryImport([result("claude", json(posting("VPRO", "Editor", "https://vpro.nl/jobs/editor")))], [], []);
-    const candidates = selectAssessmentCandidates([{ id: 1, active: true, contentHash: planned.item.contentHash }], [], "profile", "normal");
+    const candidates = selectAssessmentCandidates([{ id: 1, active: true, contentHash: planned.item.contentHash, originalText: planned.item.originalText }], [], "profile", "normal");
     expect(candidates.map((candidate) => candidate.id)).toEqual([1]);
   });
 });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { queryVacancyList } from "@/lib/db/application-queries";
+import { METADATA_ONLY_BADGE } from "@/lib/vacancy-depth";
 import { type RawSearchParams } from "@/lib/vacancy-list";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Raw
     <select name="sort" defaultValue={q.sort}><option value="newest">Nieuwste</option><option value="deadline">Deadline</option><option value="ai-score">Beste match</option></select><button>Filter</button>
   </form><div className="table-wrap"><table className="vacancy-table"><thead><tr><th>Vacature</th><th>Beoordelingen</th><th>Locatie</th><th>Uren</th><th>Salaris</th><th>Deadline</th><th>Bronnen</th></tr></thead><tbody>{items.map((r) => <tr key={r.id}>
     <td><Link href={`/vacatures/${r.id}`}><b>{r.title}</b></Link><br/><span className="muted">{r.employer}</span></td>
-    <td><div className="judgements"><span className="ai-badge">AI: {r.aiScore === null || r.aiVerdict === null ? "Nog geen oordeel" : `${r.aiScore} · ${verdictLabels[r.aiVerdict]}`}</span><span className="user-badge">Jasper: {r.feedback?verdictLabels[r.feedback]:"Nog geen oordeel"}</span></div></td>
+    <td><div className="judgements"><span className="ai-badge">AI: {r.aiScore === null || r.aiVerdict === null ? "Nog geen oordeel" : `${r.aiScore} · ${verdictLabels[r.aiVerdict]}`}</span><span className="user-badge">Jasper: {r.feedback?verdictLabels[r.feedback]:"Nog geen oordeel"}</span>{r.metadataOnly && <span className="depth-badge" title="Alleen metadata bekend; geen volledige vacaturetekst.">{METADATA_ONLY_BADGE}</span>}</div></td>
     <td>{r.location ?? "Niet vermeld"}</td><td>{r.hoursMin ? `${r.hoursMin}${r.hoursMax ? `–${r.hoursMax}` : ""} uur` : "Uren onbekend"}</td>
     <td>{r.salaryMin ? `€ ${r.salaryMin.toLocaleString("nl-NL")}${r.salaryMax ? `–${r.salaryMax.toLocaleString("nl-NL")}` : ""}` : (r.salaryOriginal ? "Niet gekwantificeerd" : "Niet vermeld")}</td>
     <td>{r.deadline?.toLocaleDateString("nl-NL") ?? "Niet vermeld"}</td>

@@ -4,6 +4,7 @@ import { getDb } from "../lib/db";
 import { vacancies, vacancyOccurrences } from "../lib/db/schema";
 import { DISCOVERY_SOURCES, planDiscoveryImport, readDiscoverySource, type DiscoveryCounts, type FeedResult } from "../lib/ingestion/discovery-import";
 import { normalizeDiscoveryUrl, type DiscoveryVacancy } from "../lib/ingestion/discovery-feed";
+import { enrichDiscoveryVacancy } from "../lib/ingestion/discovery-enrichment";
 import { runIngestSource } from "../lib/ingestion/ingest-runner";
 import { recomputeVacancyActivity } from "../lib/vacancy-lifecycle";
 
@@ -14,7 +15,7 @@ const completed: Array<{ result: FeedResult; counts: DiscoveryCounts; skipped: b
 function values(item: DiscoveryVacancy) {
   return { canonicalKey: item.canonicalKey, title: item.title, employer: item.employer, location: item.location, hoursMin: item.hoursMin, hoursMax: item.hoursMax,
     hoursOriginal: item.hoursOriginal, salaryMin: item.salaryMin, salaryMax: item.salaryMax, salaryPeriod: item.salaryPeriod, salaryOriginal: item.salaryOriginal,
-    description: item.originalText, originalText: item.originalText, contentHash: item.contentHash, firstSeenAt: item.firstSeenAt, lastSeenAt: new Date(), active: true };
+    description: item.description, originalText: item.originalText, contentHash: item.contentHash, firstSeenAt: item.firstSeenAt, lastSeenAt: new Date(), active: true };
 }
 
 for (const config of DISCOVERY_SOURCES) {
@@ -25,22 +26,25 @@ for (const config of DISCOVERY_SOURCES) {
     const existingVacancies = await db.select({ id: vacancies.id, employer: vacancies.employer, title: vacancies.title }).from(vacancies);
     const existingOccurrences = await db.select({ id: vacancyOccurrences.id, vacancyId: vacancyOccurrences.vacancyId, sourceId: vacancyOccurrences.sourceId, sourceUrl: vacancyOccurrences.sourceUrl, rawData: vacancyOccurrences.rawData }).from(vacancyOccurrences);
     const plan = planDiscoveryImport([selected], existingVacancies, existingOccurrences);
-    const createdVacancies = new Map<string, number>(); const counts = { imported: 0, duplicates: 0 };
+    const createdVacancies = new Map<string, number>(); const counts = { imported: 0, duplicates: 0 }; const depth = { enriched: 0, metadataOnly: 0 };
     for (const planned of plan) {
+      // Alleen nieuwe vacatures worden verrijkt; duplicaten hebben hun tekst al via de eigen bron.
+      const { item, outcome } = planned.duplicate ? { item: planned.item, outcome: null } : await enrichDiscoveryVacancy(planned.item);
+      if (!planned.duplicate) { if (item.contentDepth === "full") depth.enriched++; else { depth.metadataOnly++; console.log(`Metadata-only: ${item.employer} / ${item.title} (${outcome?.status}${outcome?.reason ? `: ${outcome.reason}` : ""})`); } }
       let vacancyId = planned.existingVacancyId ?? (planned.newVacancyKey ? createdVacancies.get(planned.newVacancyKey) : undefined);
-      if (!planned.duplicate) { const [created] = await db.insert(vacancies).values(values(planned.item)).returning({ id: vacancies.id }); vacancyId = created.id; createdVacancies.set(planned.newVacancyKey!, vacancyId); counts.imported++; }
+      if (!planned.duplicate) { const [created] = await db.insert(vacancies).values(values(item)).returning({ id: vacancies.id }); vacancyId = created.id; createdVacancies.set(planned.newVacancyKey!, vacancyId); counts.imported++; }
       else counts.duplicates++;
-      if (!vacancyId) throw new Error(`Geplande discovery-vacature kon niet worden gekoppeld: ${planned.item.employer} / ${planned.item.title}`);
-      const occurrence = existingOccurrences.find((row) => row.sourceId === source.id && normalizeDiscoveryUrl(row.sourceUrl) === normalizeDiscoveryUrl(planned.item.sourceUrl));
-      if (occurrence) await db.update(vacancyOccurrences).set({ vacancyId, sourceRunId: run.id, lastSeenAt: new Date(), active: true, rawData: planned.item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
-      else await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, sourceUrl: planned.item.sourceUrl, rawData: planned.item.rawData, active: true }).onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, lastSeenAt: new Date(), active: true, rawData: planned.item.rawData } });
+      if (!vacancyId) throw new Error(`Geplande discovery-vacature kon niet worden gekoppeld: ${item.employer} / ${item.title}`);
+      const occurrence = existingOccurrences.find((row) => row.sourceId === source.id && normalizeDiscoveryUrl(row.sourceUrl) === normalizeDiscoveryUrl(item.sourceUrl));
+      if (occurrence) await db.update(vacancyOccurrences).set({ vacancyId, sourceRunId: run.id, lastSeenAt: new Date(), active: true, rawData: item.rawData }).where(eq(vacancyOccurrences.id, occurrence.id));
+      else await db.insert(vacancyOccurrences).values({ vacancyId, sourceId: source.id, sourceRunId: run.id, sourceUrl: item.sourceUrl, rawData: item.rawData, active: true }).onConflictDoUpdate({ target: [vacancyOccurrences.sourceId, vacancyOccurrences.sourceUrl], set: { vacancyId, sourceRunId: run.id, lastSeenAt: new Date(), active: true, rawData: item.rawData } });
       await recomputeVacancyActivity([vacancyId]);
     }
     completed.push({ result: selected, counts, skipped: false });
     const errors = [...selected.errors, ...(selected.fatalError ? [selected.fatalError] : [])];
     return { resultCount: selected.found, newCount: counts.imported, changedCount: 0, duplicates: counts.duplicates, warnings: selected.errors, trustworthy: !selected.fatalError,
       status: selected.fatalError ? "error" as const : errors.length ? "warning" as const : "success" as const, error: selected.fatalError,
-      summaryRows: [["Found", selected.found], ["Imported", counts.imported], ["Duplicates", counts.duplicates], ["Errors", errors.length]] };
+      summaryRows: [["Found", selected.found], ["Imported", counts.imported], ["Duplicates", counts.duplicates], ["Met volledige vacaturetekst", depth.enriched], ["Alleen metadata", depth.metadataOnly], ["Errors", errors.length]] };
   });
   if (execution.status === "skipped") completed.push({ result: { source: config, found: 0, vacancies: [], errors: [] }, counts: { imported: 0, duplicates: 0 }, skipped: true });
 }

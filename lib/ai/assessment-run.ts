@@ -1,8 +1,9 @@
+import { vacancyContentDepth } from "../vacancy-depth";
 import { assessmentIsCurrent } from "./vacancy-assessment";
 
 export type AssessmentMode = "normal" | "preview" | "reassess";
 
-type VacancyState = { id: number; active: boolean; contentHash: string };
+type VacancyState = { id: number; active: boolean; contentHash: string; originalText: string };
 type AssessmentState = { vacancyId: number; vacancyContentHash: string; profileHash: string; promptVersion: string; model: string };
 
 export function parseAssessmentMode(args: string[]): AssessmentMode {
@@ -21,5 +22,5 @@ export function selectAssessmentCandidates<T extends VacancyState>(
   const active = vacancyRows.filter((vacancy) => vacancy.active);
   if (mode === "preview" || mode === "reassess") return active;
   const existing = new Map(assessmentRows.map((assessment) => [assessment.vacancyId, assessment]));
-  return active.filter((vacancy) => !assessmentIsCurrent(existing.get(vacancy.id), vacancy.contentHash, profileHash));
+  return active.filter((vacancy) => !assessmentIsCurrent(existing.get(vacancy.id), vacancy.contentHash, profileHash, vacancyContentDepth(vacancy)));
 }

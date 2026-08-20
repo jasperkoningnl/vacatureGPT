@@ -1,6 +1,7 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from ".";
 import { aiAssessments, feedback, sources, vacancies, vacancyOccurrences } from "./schema";
+import { MIN_FULL_VACANCY_TEXT } from "../vacancy-depth";
 import { buildVacancyListConditions, dedupeVacancyRows, parseVacancyListFilters, resolveSourceFilter, vacancyListOrdering, type RawSearchParams } from "../vacancy-list";
 
 export type Database = ReturnType<typeof getDb>;
@@ -15,6 +16,8 @@ export async function queryVacancyList(db: Database, rawFilters: RawSearchParams
     salaryMax: vacancies.salaryMax, salaryOriginal: vacancies.salaryOriginal, deadline: vacancies.deadline,
     url: vacancyOccurrences.sourceUrl, source: sources.name, feedback: feedback.value,
     aiScore: aiAssessments.score, aiVerdict: aiAssessments.verdict,
+    // Dezelfde diepteregel als lib/vacancy-depth, maar in SQL zodat de lijst geen volledige vacatureteksten hoeft op te halen.
+    metadataOnly: sql<boolean>`length(btrim(${vacancies.originalText})) < ${MIN_FULL_VACANCY_TEXT}`,
   }).from(vacancies)
     .innerJoin(vacancyOccurrences, and(eq(vacancies.id, vacancyOccurrences.vacancyId), eq(vacancyOccurrences.active, true)))
     .innerJoin(sources, eq(vacancyOccurrences.sourceId, sources.id))
