@@ -5,9 +5,9 @@ import { useFormStatus } from "react-dom";
 import { saveShortlist, saveTrackingDetails, type TrackingState } from "@/app/actions";
 import { applicationStatusLabels, applicationStatuses, type TrackingData } from "@/lib/vacancy-tracking";
 
-function Submit({ children }: { children: React.ReactNode }) {
+function Submit({ children, variant }: { children: React.ReactNode; variant?: "secondary" }) {
   const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending}>{pending ? "Bezig met opslaan…" : children}</button>;
+  return <button type="submit" className={variant} disabled={pending}>{pending ? "Bezig met opslaan…" : children}</button>;
 }
 
 function Message({ state }: { state: TrackingState }) {
@@ -25,7 +25,7 @@ export function TrackingForm({ vacancyId, tracking }: { vacancyId: number; track
       <div><strong>{savedShortlist ? "Op shortlist" : "Niet op shortlist"}</strong><p className="muted">Shortlist staat los van je inhoudelijke beoordeling.</p></div>
       <form action={shortlistAction}>
         <input type="hidden" name="vacancyId" value={vacancyId}/><input type="hidden" name="shortlisted" value={savedShortlist ? "false" : "true"}/>
-        <Submit>{savedShortlist ? "Van shortlist verwijderen" : "Op shortlist zetten"}</Submit>
+        <Submit variant={savedShortlist ? "secondary" : undefined}>{savedShortlist ? "Van shortlist verwijderen" : "Op shortlist zetten"}</Submit>
       </form>
     </div>
     <Message state={shortlistState}/>

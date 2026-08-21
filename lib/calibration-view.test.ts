@@ -32,10 +32,15 @@ describe("shared vacancy review", () => {
     expect(store).toContain("export async function storeFeedbackReason");
   });
 
-  it("rondt de batch af met een route naar Mijn selectie naast een nieuwe ronde", () => {
-    expect(calibration).toContain('<Link className="button" href="/">Naar mijn selectie</Link>');
-    expect(calibration).toContain('<a className="button secondary" href="/kalibreren">Nog 5 beoordelen</a>');
-    expect(calibration).toContain("Je zojuist als interessant beoordeelde vacatures staan nu in Mijn selectie.");
+  it("rondt de blinde test af met een route terug naar de weekpagina naast een nieuwe ronde", () => {
+    expect(calibration).toContain('<Link className="button" href="/">Naar deze week</Link>');
+    expect(calibration).toContain('<a className="button secondary" href="/kalibreren">Nog 5 blind beoordelen</a>');
+    expect(calibration).toContain("Deze oordelen tellen mee als leersignaal voor de volgende AI-ronde.");
+  });
+
+  it("presenteert kalibreren als losse blinde test, niet als de dagelijkse route", () => {
+    expect(calibration).toContain("Blinde test · zonder AI-oordeel");
+    expect(calibration).toContain("Je ziet het AI-oordeel pas nadat je zelf hebt gekozen.");
   });
 
   it("geeft de voortgangsbalk echte progressbar-semantiek", () => {

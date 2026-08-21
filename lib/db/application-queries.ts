@@ -1,6 +1,6 @@
 import { and, asc, countDistinct, eq, inArray } from "drizzle-orm";
 import { getDb } from ".";
-import { aiAssessments, sources, vacancies, vacancyOccurrences } from "./schema";
+import { aiAssessments, sources, vacancies, vacancyOccurrences, vacancyTracking } from "./schema";
 import { latestFeedbackPerVacancy } from "./latest-feedback";
 import { MIN_FULL_VACANCY_TEXT } from "../vacancy-depth";
 import { rejectedVerdict } from "../vacancy-funnel";
@@ -33,10 +33,12 @@ export async function queryVacancyList(db: Database, rawFilters: RawSearchParams
     hoursMin: vacancies.hoursMin, hoursMax: vacancies.hoursMax, salaryMin: vacancies.salaryMin, salaryMax: vacancies.salaryMax,
     salaryOriginal: vacancies.salaryOriginal, deadline: vacancies.deadline, url: vacancyOccurrences.sourceUrl, source: sources.name,
     feedback: latest.value, aiScore: aiAssessments.score, aiVerdict: aiAssessments.verdict,
+    shortlisted: sql<boolean>`${vacancyTracking.shortlistedAt} is not null`,
     metadataOnly: sql<boolean>`length(btrim(${vacancies.originalText})) < ${MIN_FULL_VACANCY_TEXT}`,
   }).from(vacancies).innerJoin(vacancyOccurrences, and(eq(vacancies.id, vacancyOccurrences.vacancyId), eq(vacancyOccurrences.active, true)))
     .innerJoin(sources, eq(vacancyOccurrences.sourceId, sources.id)).leftJoin(latest, eq(vacancies.id, latest.vacancyId))
-    .leftJoin(aiAssessments, eq(vacancies.id, aiAssessments.vacancyId)).where(inArray(vacancies.id, selectedIds)).orderBy(asc(vacancyOccurrences.id)) : [];
+    .leftJoin(aiAssessments, eq(vacancies.id, aiAssessments.vacancyId)).leftJoin(vacancyTracking, eq(vacancies.id, vacancyTracking.vacancyId))
+    .where(inArray(vacancies.id, selectedIds)).orderBy(asc(vacancyOccurrences.id)) : [];
   const byId = new Map(dedupeVacancyRows(rows).map((item) => [item.id, item]));
   return { sourceOptions, filters: normalizedFilters, items: selectedIds.flatMap((id) => byId.get(id) ? [byId.get(id)!] : []), total, pageCount, rejectedCount: await countRejected(db, filters) };
 }

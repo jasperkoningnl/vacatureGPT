@@ -120,3 +120,35 @@ export function dedupeVacancyRows<Row extends { id: number; url: string; source:
   }
   return [...items.values()];
 }
+
+/**
+ * Bladeren begint zelden bij een leeg formulier. Deze vaste ingangen dekken de vragen die je
+ * echt stelt — wat wachtte er nog, wat liet de AI liggen, wat vond ik zelf goed — en zetten
+ * precies dezelfde filters als het formulier eronder, zodat er geen tweede waarheid ontstaat.
+ */
+export type ListPreset = { key: string; label: string; description: string; params: Partial<Record<"feedback" | "ai" | "sort" | "rejected", string>> };
+
+export const listPresets: ListPreset[] = [
+  { key: "promising", label: "Kansrijk volgens AI", description: "Wat nu in je beoordeelrij staat.", params: { feedback: "unreviewed", ai: "promising", sort: "ai-score" } },
+  { key: "passed-over", label: "Door AI weggelaten", description: "Wat de selectie niet haalde en dus nooit in je mail kwam.", params: { feedback: "unreviewed", ai: "not_suitable", sort: "newest" } },
+  { key: "unreviewed", label: "Nog niet beoordeeld", description: "Alles zonder eigen oordeel, ongeacht wat de AI vond.", params: { feedback: "unreviewed", sort: "newest" } },
+  { key: "interesting", label: "Door mij interessant", description: "Je eigen positieve oordelen.", params: { feedback: "interesting", sort: "newest" } },
+  { key: "rejected", label: "Door mij afgewezen", description: "Wat je hebt weggelegd; standaard verborgen.", params: { feedback: "not_suitable", rejected: "show", sort: "newest" } },
+  { key: "all", label: "Alles", description: "De volledige actieve lijst.", params: { sort: "newest" } },
+];
+
+export function presetSearch(preset: ListPreset): string {
+  const params = new URLSearchParams(preset.params as Record<string, string>);
+  const search = params.toString();
+  return search ? `?${search}` : "";
+}
+
+/** Een preset is actief als elk veld dat hij zet ook echt zo staat, en er geen ander oordeelfilter tussen zit. */
+export function activePresetKey(filters: VacancyListFilters): string | null {
+  const current = { feedback: filters.feedback, ai: filters.ai, rejected: filters.rejected };
+  for (const preset of listPresets) {
+    const wanted = { feedback: preset.params.feedback, ai: preset.params.ai, rejected: preset.params.rejected };
+    if (current.feedback === wanted.feedback && current.ai === wanted.ai && current.rejected === wanted.rejected) return preset.key;
+  }
+  return null;
+}

@@ -86,11 +86,19 @@ describe("limited reliability is visible in the interface", () => {
   const list = readFileSync("app/vacatures/page.tsx", "utf8");
   const listQuery = readFileSync("lib/db/application-queries.ts", "utf8");
 
-  it("marks the assessment and the vacancy text on both review routes", () => {
+  it("marks the assessment and the vacancy text on every review route", () => {
+    const parts = readFileSync("app/components/vacancy-parts.tsx", "utf8");
+    const queue = readFileSync("app/beoordelen/review-queue.tsx", "utf8");
+    // De waarschuwing hoort bij het oordeel zelf en staat daarom in het gedeelde onderdeel,
+    // zodat detailpagina, blinde test én beoordeelrij hem alle drie tonen.
+    expect(parts).toContain("METADATA_ONLY_ASSESSMENT_NOTICE");
     expect(shared).toContain("isMetadataOnly(vacancy)");
-    expect(shared).toContain("METADATA_ONLY_ASSESSMENT_NOTICE");
     expect(shared).toContain("METADATA_ONLY_TEXT_NOTICE");
-    expect(shared.indexOf("METADATA_ONLY_ASSESSMENT_NOTICE")).toBeLessThan(shared.indexOf("concealAssessment ?"));
+    expect(shared).toContain("<MetadataOnlyNotice/>");
+    expect(queue).toContain("<MetadataOnlyNotice/>");
+    // De waarschuwing staat vóór het oordeel, ook wanneer dat oordeel nog verborgen is.
+    expect(shared.indexOf("<MetadataOnlyNotice/>")).toBeLessThan(shared.indexOf("concealAssessment ?"));
+    expect(queue.indexOf("<MetadataOnlyNotice/>")).toBeLessThan(queue.indexOf("item.assessment ? <AiAssessmentBody"));
   });
 
   it("marks a thin vacancy in the list without loading full vacancy texts", () => {

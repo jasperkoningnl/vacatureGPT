@@ -1,0 +1,41 @@
+/* Inloggen, voorkeuren en bronnen: beheerpagina's, rustiger dan de dagelijkse routine. */
+.login-panel { max-width: 26rem; margin: clamp(2rem, 12vh, 6rem) auto; }
+.login-panel h1 { margin-bottom: var(--s2); }
+.login-panel .muted { margin-bottom: var(--s4); }
+
+.form { display: grid; gap: var(--s4); }
+.form > label { display: grid; gap: var(--s1); font-size: var(--text-sm); }
+.form > label small { color: var(--muted); font-weight: 400; }
+.form button { justify-self: start; }
+.form .filters { background: transparent; border: 0; padding: 0; }
+.form .filters label { display: grid; gap: var(--s1); flex: 1 1 11rem; font-size: var(--text-sm); }
+
+.inline-form {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--line);
+}
+.inline-form label { display: grid; gap: var(--s1); flex: 1 1 auto; font-size: var(--text-sm); }
+.inline-form button { flex: 0 0 auto; }
+
+.workflow-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: var(--s4); margin-top: var(--s4); }
+.workflow-control {
+  display: grid;
+  gap: var(--s2);
+  align-content: start;
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+.workflow-control label { display: flex; align-items: flex-start; gap: var(--s2); font-weight: 400; color: var(--muted); }
+.workflow-control input[type="checkbox"] { width: 1.1rem; min-height: 1.1rem; height: 1.1rem; flex: 0 0 auto; margin-top: .15rem; }
+
+@media (max-width: 900px) {
+  .inline-form { flex-direction: column; align-items: stretch; }
+  .inline-form button { width: 100%; }
+}

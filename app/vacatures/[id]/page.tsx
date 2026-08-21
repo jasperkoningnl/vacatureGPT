@@ -17,7 +17,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     .leftJoin(feedback, eq(feedback.vacancyId, vacancies.id)).leftJoin(aiAssessments, eq(aiAssessments.vacancyId, vacancies.id)).leftJoin(vacancyTracking, eq(vacancyTracking.vacancyId, vacancies.id)).where(eq(vacancies.id, Number(id)))
     .orderBy(desc(vacancyOccurrences.active), desc(vacancyOccurrences.lastSeenAt), asc(vacancyOccurrences.id)).limit(1);
   if (!result) notFound();
-  return <VacancyReviewDetail vacancy={result.vacancy} assessment={result.assessment} sourceUrl={result.sourceUrl} sourceName={result.source} backLink={{ href: "/vacatures", label: "Terug naar vacatures" }} tracking={<TrackingForm vacancyId={result.vacancy.id} tracking={result.tracking}/>} review={
+  return <VacancyReviewDetail vacancy={result.vacancy} assessment={result.assessment} sourceUrl={result.sourceUrl} sourceName={result.source} backLink={{ href: "/vacatures", label: "Terug naar alle vacatures" }} tracking={<TrackingForm vacancyId={result.vacancy.id} tracking={result.tracking}/>} review={
     <FeedbackForm vacancyId={result.vacancy.id} aiVerdict={result.assessment?.verdict ?? null} current={result.feedback && { value: result.feedback.value, reasonCode: result.feedback.reasonCode, note: result.feedback.note }}/>
   }/>;
 }
