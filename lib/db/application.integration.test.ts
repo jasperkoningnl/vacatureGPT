@@ -4,7 +4,7 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "./schema";
-import { aiAssessments, feedback, sourceRuns, sources, vacancies, vacancyOccurrences } from "./schema";
+import { aiAssessments, feedback, sourceRuns, sources, vacancies, vacancyOccurrences, vacancyTracking } from "./schema";
 import { type Database, queryVacancyList, setSourceEnabled } from "./application-queries";
 import { storeFeedback, storeFeedbackReason } from "./feedback";
 import { latestFeedbackPerVacancy } from "./latest-feedback";
@@ -23,7 +23,7 @@ describe("database- en actionlaag", () => {
   }, 30_000);
 
   beforeEach(async () => {
-    await client.exec("TRUNCATE feedback, ai_assessments, source_runs, vacancy_occurrences, vacancies, sources RESTART IDENTITY CASCADE");
+    await client.exec("TRUNCATE feedback, ai_assessments, vacancy_tracking, source_runs, vacancy_occurrences, vacancies, sources RESTART IDENTITY CASCADE");
   });
 
   afterAll(async () => client.close());
@@ -125,6 +125,38 @@ describe("database- en actionlaag", () => {
     expect(await listedIds({ feedback: "not_suitable" })).toEqual([rejected.id]);
     expect(await listedIds({ feedback: "unreviewed" })).toEqual([]);
     expect(await db.select().from(feedback).where(eq(feedback.vacancyId, rejected.id))).toEqual(before);
+  });
+
+  it("laat in de lijst zien wat al op de shortlist staat, zonder dat het een filter wordt", async () => {
+    const listSource = await source("villamedia");
+    const shortlisted = await vacancy("shortlist");
+    const plain = await vacancy("gewoon");
+    await db.insert(vacancyOccurrences).values([
+      { vacancyId: shortlisted.id, sourceId: listSource.id, sourceUrl: "https://villamedia.example/shortlist", rawData: {} },
+      { vacancyId: plain.id, sourceId: listSource.id, sourceUrl: "https://villamedia.example/gewoon", rawData: {} },
+    ]);
+    await db.insert(vacancyTracking).values({ vacancyId: shortlisted.id, shortlistedAt: new Date() });
+
+    const { items } = await queryVacancyList(db, {});
+    expect(items).toHaveLength(2);
+    expect(new Map(items.map(({ id, shortlisted: flag }) => [id, flag]))).toEqual(new Map([[shortlisted.id, true], [plain.id, false]]));
+  });
+
+  it("houdt één rij per vacature, ook met meerdere vindplaatsen én tracking", async () => {
+    const first = await source("villamedia");
+    const second = await source("oneworld");
+    const item = await vacancy("dubbel");
+    await db.insert(vacancyOccurrences).values([
+      { vacancyId: item.id, sourceId: first.id, sourceUrl: "https://villamedia.example/dubbel", rawData: {} },
+      { vacancyId: item.id, sourceId: second.id, sourceUrl: "https://oneworld.example/dubbel", rawData: {} },
+    ]);
+    await db.insert(vacancyTracking).values({ vacancyId: item.id, shortlistedAt: new Date() });
+
+    const { items, total } = await queryVacancyList(db, {});
+    expect(total).toBe(1);
+    expect(items).toHaveLength(1);
+    expect(items[0].occurrences).toHaveLength(2);
+    expect(items[0].shortlisted).toBe(true);
   });
 
   it("weigert een afwijkend oordeel zonder reden op de detailpagina en bewaart het mét reden wel", async () => {

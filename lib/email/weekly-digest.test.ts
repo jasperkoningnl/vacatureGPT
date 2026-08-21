@@ -66,6 +66,37 @@ describe("weekly email content", () => {
     expect(output).not.toContain(secret);
   });
 
+  it("begint met dezelfde handeling als de site: de tips één voor één langslopen", () => {
+    const message = buildWeeklyDigest([vacancy(), vacancy({ id: 2, title: "Eindredacteur" })], "https://vacatures.example", now);
+    expect(message.subject).toBe("VacatureGPT — 2 nieuwe vacatures deze week");
+    expect(message.html).toContain("2 kansrijke vacatures deze week");
+    for (const body of [message.html, message.text]) {
+      expect(body).toContain("https://vacatures.example/beoordelen");
+      expect(body).toContain("Beoordeel ze één voor één");
+      expect(body).toContain("https://vacatures.example/shortlist");
+      // De oproep staat vóór de kaarten: eerst de handeling, dan de opsomming.
+      expect(body.indexOf("/beoordelen")).toBeLessThan(body.indexOf("/vacatures/1"));
+    }
+  });
+
+  it("zegt bij één vacature ook 'vacature' en niet 'vacatures'", () => {
+    const message = buildWeeklyDigest([vacancy()], "https://vacatures.example", now);
+    expect(message.subject).toBe("VacatureGPT — 1 nieuwe vacature deze week");
+    expect(message.html).toContain("1 kansrijke vacature deze week");
+  });
+
+  it("draagt dezelfde deadline-urgentie als de site, ook zonder kleur", () => {
+    const message = buildWeeklyDigest([vacancy({ deadline: new Date("2026-08-12T21:59:00Z") })], "https://vacatures.example", now);
+    expect(message.text).toContain("Sluit morgen · 12 augustus 2026");
+    expect(buildWeeklyDigest([vacancy({ deadline: null })], "https://vacatures.example", now).text).not.toContain("Sluit");
+  });
+
+  it("ontsnapt tekst uit de vacature in plaats van hem als HTML te plaatsen", () => {
+    const message = buildWeeklyDigest([vacancy({ title: '<script>alert("x")</script>' })], "https://vacatures.example", now);
+    expect(message.html).not.toContain("<script>");
+    expect(message.html).toContain("&lt;script&gt;");
+  });
+
   it("uses a stable ISO week retry key", () => {
     expect(weeklyRunKey(now)).toBe("2026-W33");
     expect(weeklyRunKey(new Date("2026-08-12T23:00:00Z"))).toBe("2026-W33");

@@ -1,0 +1,143 @@
+/* Raamwerk: één breedte, één header, en koppen die overal op dezelfde manier beginnen. */
+.shell { max-width: var(--shell); margin-inline: auto; padding-inline: var(--s5); }
+
+main { padding-block: var(--s7) var(--s8); }
+
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  min-height: 4rem;
+}
+.site-nav .brand {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+  margin-right: auto;
+}
+.nav-group { display: flex; align-items: center; gap: var(--s4); }
+.nav-manage {
+  gap: var(--s3);
+  padding-left: var(--s5);
+  border-left: 1px solid var(--line);
+}
+.nav-group-label {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.site-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  padding-block: var(--s2);
+  border-bottom: 2px solid transparent;
+  transition: color var(--transition), border-color var(--transition);
+}
+.site-nav a:hover { color: var(--ink); }
+.nav-secondary { font-size: var(--text-sm); }
+.site-nav a.nav-active { color: var(--ink); font-weight: 700; border-bottom-color: var(--accent); }
+.site-nav a.nav-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  padding: .5rem .85rem;
+  border-radius: var(--radius-sm);
+  border-bottom: 0;
+}
+.site-nav a.nav-primary:hover { background: var(--accent-hover); color: var(--accent-ink); }
+.site-nav a.nav-primary.nav-active { color: var(--accent-ink); border-bottom: 0; }
+
+/* Elke pagina opent met dezelfde kop: eyebrow, titel, korte uitleg, telling rechts. */
+.page-title, .section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s5);
+}
+.page-title { padding-bottom: var(--s4); border-bottom: 1px solid var(--line); margin-bottom: var(--s5); }
+.page-title h1 { margin-bottom: var(--s2); }
+.page-title .lead { font-size: var(--text-base); max-width: 52ch; }
+.section-head { margin-bottom: var(--s4); }
+.section-head h2 { margin-bottom: var(--s1); }
+.section-head .muted { max-width: 44ch; font-size: var(--text-sm); }
+.section-link { color: var(--accent); font-weight: 600; font-size: var(--text-sm); white-space: nowrap; text-decoration: none; }
+.section-link:hover { text-decoration: underline; }
+
+/* De opening van de weekpagina: wat er ligt, en de knop die het afhandelt. */
+.hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s6);
+  padding-bottom: var(--s6);
+  border-bottom: 1px solid var(--line);
+}
+.hero-copy { max-width: 40rem; }
+.hero-copy h1 { margin-bottom: var(--s3); }
+.hero-action { flex: 0 0 auto; text-align: right; max-width: 18rem; }
+.hero-action p { color: var(--muted); font-size: var(--text-sm); margin-top: var(--s3); }
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s5);
+  padding-block: var(--s5);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s7);
+}
+.metrics > div { border-left: 2px solid var(--line); padding-left: var(--s4); }
+.metrics span { display: block; color: var(--muted); font-size: var(--text-sm); }
+.metrics strong { display: block; font-family: var(--font-display); font-size: 2.25rem; line-height: 1.1; margin-block: var(--s1); }
+.metric-note { color: var(--muted); font-size: var(--text-xs); line-height: 1.45; }
+
+.funnel-section { margin-bottom: var(--s7); }
+.funnel-empty { padding: var(--s5) 0; border-top: 1px solid var(--line); }
+
+/* De drie zijsporen naast de weekstapel: bladeren, blinde test, afstemmen. */
+.side-tracks {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s5);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--line);
+}
+.side-tracks h3 { margin-bottom: var(--s2); }
+.side-tracks p { font-size: var(--text-sm); margin-bottom: var(--s3); }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s5);
+  margin-top: var(--s5);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.pagination a { color: var(--accent); font-weight: 600; text-decoration: none; }
+
+@media (max-width: 900px) {
+  .shell { padding-inline: var(--s4); }
+  main { padding-block: var(--s5) var(--s7); }
+  .site-header { position: static; }
+  .site-nav { flex-wrap: wrap; gap: var(--s2) var(--s4); padding-block: var(--s3); }
+  .site-nav .brand { flex: 1 0 100%; margin: 0; }
+  /* Beide groepen blijven één regel en schuiven horizontaal; anders vult de navigatie het halve scherm. */
+  .nav-group { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: var(--s1); }
+  .nav-group::-webkit-scrollbar { display: none; }
+  .nav-manage { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); padding-top: var(--s2); }
+  .page-title, .section-head, .hero { flex-direction: column; align-items: flex-start; }
+  .hero-action { text-align: left; max-width: none; width: 100%; }
+  .hero-action .button { width: 100%; }
+  .metrics { grid-template-columns: 1fr; gap: var(--s4); }
+  .side-tracks { grid-template-columns: 1fr; }
+}

@@ -2,7 +2,7 @@ import "./globals.css";
 import { SiteNav } from "./components/site-nav";
 
 export const metadata = {
-  title: { default: "Mijn selectie · VacatureGPT", template: "%s · VacatureGPT" },
+  title: { default: "Deze week · VacatureGPT", template: "%s · VacatureGPT" },
   description: "Persoonlijke vacaturezoeker",
   applicationName: "VacatureGPT",
   robots: { index: false, follow: false },

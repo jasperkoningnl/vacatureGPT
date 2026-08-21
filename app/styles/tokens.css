@@ -1,0 +1,92 @@
+/*
+ * Eén set variabelen voor de hele app. Kleur draagt hier betekenis: groen is het AI-advies,
+ * zand is jouw eigen oordeel, paars is de sollicitatiestap. Die drie lagen blijven overal
+ * uit elkaar te houden, in licht én in donker. Al het overige is papier, inkt en haarlijn.
+ */
+:root {
+  color-scheme: light dark;
+
+  --paper: #f4f3ef;
+  --surface: #ffffff;
+  --surface-sunken: #eceae4;
+  --ink: #1b2320;
+  --ink-soft: #3d4842;
+  --muted: #5f6b64;
+  --line: #dce0db;
+  --line-strong: #b9c2bb;
+
+  --accent: #1c5c42;
+  --accent-hover: #144632;
+  --accent-ink: #ffffff;
+  --accent-soft: #e4efe8;
+  --accent-soft-ink: #14503a;
+
+  --own: #6b5a33;
+  --own-soft: #f0eadd;
+  --track: #58407a;
+  --track-soft: #ebe3f4;
+
+  --warning: #8a5b16;
+  --warning-soft: #f6ebd8;
+  --danger: #963029;
+  --danger-soft: #f7e4e2;
+  --focus: #2f8a63;
+
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 10px;
+  --radius-pill: 999px;
+
+  --s1: .25rem;
+  --s2: .5rem;
+  --s3: .75rem;
+  --s4: 1rem;
+  --s5: 1.5rem;
+  --s6: 2rem;
+  --s7: 3rem;
+  --s8: 4.5rem;
+
+  --font-body: "Avenir Next", Avenir, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
+
+  --text-xs: .8125rem;
+  --text-sm: .875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+
+  --measure: 68ch;
+  --shell: 1180px;
+  --reading: 46rem;
+
+  --transition: 140ms ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #141a17;
+    --surface: #1b2320;
+    --surface-sunken: #232c28;
+    --ink: #e7ebe8;
+    --ink-soft: #c7d0ca;
+    --muted: #a3aea7;
+    --line: #2e3833;
+    --line-strong: #4a554e;
+
+    --accent: #7cc39d;
+    --accent-hover: #9ad4b4;
+    --accent-ink: #0f1a15;
+    --accent-soft: #23362c;
+    --accent-soft-ink: #a8ddbd;
+
+    --own: #ddc891;
+    --own-soft: #362f22;
+    --track: #c7abe6;
+    --track-soft: #2f2740;
+
+    --warning: #dcae5f;
+    --warning-soft: #362d1c;
+    --danger: #ef918b;
+    --danger-soft: #3a2523;
+    --focus: #8ed3ae;
+  }
+}

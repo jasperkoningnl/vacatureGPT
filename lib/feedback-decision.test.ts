@@ -91,13 +91,15 @@ describe("the server refuses to store a decision that was not taken", () => {
     expect(actions.indexOf("isFeedbackDecision(form")).toBeLessThan(actions.indexOf("storeFeedback(getDb()"));
   });
 
-  it("guards the calibration action with exactly the same rule", () => {
+  it("guards every other review route with exactly the same rule", () => {
     expect(actions).toContain("if(!isFeedbackDecision(input?.value))throw new Error(NO_DECISION_MESSAGE)");
-    expect(actions.match(/z\.enum\(feedbackDecisions\)/g)?.length).toBe(2);
+    expect(actions).toContain('if(!isFeedbackDecision(input?.value))return{status:"error",message:NO_DECISION_MESSAGE}');
+    // Detailformulier, blinde test en beoordeelrij: drie ingangen, één en dezelfde enum.
+    expect(actions.match(/z\.enum\(feedbackDecisions\)/g)?.length).toBe(3);
   });
 
-  it("routes both flows through the single eligibility boundary", () => {
-    expect(actions.match(/storeFeedback\(/g)?.length).toBe(2);
+  it("routes every flow through the single eligibility boundary", () => {
+    expect(actions.match(/storeFeedback\(/g)?.length).toBe(3);
     const store = readFileSync("lib/db/feedback.ts", "utf8");
     expect(store).toContain("validateFeedback");
     expect(store).toContain("assertFeedbackIsComplete");

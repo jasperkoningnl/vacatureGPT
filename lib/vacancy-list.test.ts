@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { and } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { buildVacancyListConditions, dedupeVacancyRows, parseVacancyListFilters, resolveSourceFilter, showsRejected, type VacancyListFilters } from "./vacancy-list";
+import { activePresetKey, buildVacancyListConditions, dedupeVacancyRows, listPresets, parseVacancyListFilters, presetSearch, resolveSourceFilter, showsRejected, type VacancyListFilters } from "./vacancy-list";
 
 const dialect = new PgDialect();
 const toSql = (filters: Partial<VacancyListFilters>) => dialect.sqlToQuery(and(...buildVacancyListConditions({ sort: "newest", ...filters }))!);
@@ -171,4 +171,37 @@ describe("afgewezen vacatures staan standaard buiten de lijst", () => {
 describe("vrije tekstzoek en paginering", () => {
   it("valideert zoektekst en positieve paginanummers", () => { expect(parseVacancyListFilters({ query: "  hoofdredacteur ", page: "3" })).toMatchObject({ query: "hoofdredacteur", page: 3 }); expect(parseVacancyListFilters({ page: "-1" }).page).toBe(1); });
   it("zoekt in titel, werkgever, beschrijving en oorspronkelijke tekst", () => { const query=toSql({ query: "cultuur" }); expect(query.sql.match(/ilike/g)).toHaveLength(4); expect(query.params.filter((x) => x === "%cultuur%")).toHaveLength(4); });
+});
+
+describe("de vaste ingangen boven de lijst", () => {
+  it("zet alleen filterwaarden die de lijst zelf ook kent", () => {
+    for (const preset of listPresets) {
+      const parsed = parseVacancyListFilters(preset.params);
+      expect(parsed.feedback).toBe(preset.params.feedback);
+      expect(parsed.ai).toBe(preset.params.ai);
+      expect(parsed.rejected).toBe(preset.params.rejected);
+      expect(parsed.sort).toBe(preset.params.sort ?? "newest");
+    }
+  });
+
+  it("dekt de vragen die je echt stelt, elk met een eigen combinatie", () => {
+    expect(listPresets.map(({ key }) => key)).toEqual(["promising", "passed-over", "unreviewed", "interesting", "rejected", "all"]);
+    expect(new Set(listPresets.map((preset) => JSON.stringify(preset.params))).size).toBe(listPresets.length);
+    expect(listPresets.find(({ key }) => key === "passed-over")?.params).toMatchObject({ ai: "not_suitable", feedback: "unreviewed" });
+    // Wat je zelf hebt afgewezen is standaard verborgen; die ingang zet de schakelaar dus mee aan.
+    expect(showsRejected(parseVacancyListFilters(listPresets.find(({ key }) => key === "rejected")!.params))).toBe(true);
+  });
+
+  it("markeert de ingang die bij de huidige filters hoort, en anders geen", () => {
+    for (const preset of listPresets) expect(activePresetKey(parseVacancyListFilters(preset.params))).toBe(preset.key);
+    expect(activePresetKey(parseVacancyListFilters({}))).toBe("all");
+    expect(activePresetKey(parseVacancyListFilters({ ai: "maybe" }))).toBeNull();
+  });
+
+  it("bouwt een querystring die de lijst rechtstreeks begrijpt", () => {
+    const search = presetSearch(listPresets[0]);
+    expect(search.startsWith("?")).toBe(true);
+    expect(parseVacancyListFilters(Object.fromEntries(new URLSearchParams(search.slice(1))))).toMatchObject({ feedback: "unreviewed", ai: "promising", sort: "ai-score" });
+    expect(presetSearch({ key: "leeg", label: "", description: "", params: {} })).toBe("");
+  });
 });

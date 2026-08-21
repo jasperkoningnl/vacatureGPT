@@ -10,6 +10,27 @@ optionele wekelijkse e-mail.
 > **Projectdoorlichting:** zie [de volledige analyse van techniek, functionaliteit,
 > vormgeving en gebruiksvriendelijkheid](docs/analyse-2026-08-20.md), inclusief
 > geprioriteerde verbetervoorstellen en ideeën voor nieuwe functionaliteit.
+> De interactie en vormgeving zijn daarna herzien rond één weekroutine; die keuzes staan in
+> [het ontwerpdocument](docs/ontwerp-weekroutine.md).
+
+## De weekroutine
+
+De app kent één hoofdweg, en de weekmail is er het beginpunt van:
+
+1. **Deze week** (`/`) toont wat er ligt: het aantal kansrijke tips, je shortlist en wat je
+   voor later bewaarde. De knop erboven is dezelfde als in de mail.
+2. **Beoordelen** (`/beoordelen`) loopt die tips één voor één langs, met het AI-advies er
+   open bij. Elke vacature krijgt één van drie oordelen: *op shortlist* (zet hem meteen op
+   je shortlist), *bewaren voor later* of *niet passend*. Wijkt je oordeel af van dat van de
+   AI, dan vraagt de rij eerst om een reden — dezelfde regel als op de vacaturepagina.
+3. **Shortlist** (`/shortlist`) staat op deadline gesorteerd; de sollicitatiestatus werk je
+   daar direct bij, zonder eerst een vacature te openen.
+4. **Alle vacatures** (`/vacatures`) is er om zelf te bladeren, inclusief wat de AI juist
+   niet selecteerde. Elke rij heeft een knop naar dezelfde beoordeelrij voor die ene vacature.
+
+Daarnaast staan de **blinde test** (`/kalibreren`, vijf vacatures zonder AI-oordeel),
+**voorkeuren** en **bronnen** in een aparte, secundaire navigatiegroep. Elk oordeel en elke
+reden is een append-only feedback-event en voedt de volgende AI-ronde.
 
 ## Lokaal starten
 
@@ -61,8 +82,15 @@ het nieuwste event per vacature; alleen events met `learningEligible=true` telle
 leren.
 
 `/vacatures` ondersteunt vrije tekstzoek op titel, werkgever en vacaturetekst, combineert
-dubbele vindplaatsen tot één vacature en pagineert de unieke resultaten. Filters en pagina
-blijven via de URL deelbaar.
+dubbele vindplaatsen tot één vacature en pagineert de unieke resultaten. Boven de lijst staan
+vaste ingangen (kansrijk volgens AI, door AI weggelaten, nog niet beoordeeld, door mij
+interessant, door mij afgewezen, alles); die zetten precies dezelfde filters als het formulier
+eronder. Filters en pagina blijven via de URL deelbaar.
+
+De stijl staat in `app/styles/` en laadt in vaste volgorde via `app/globals.css`: eerst
+`tokens.css` (kleur, ruimte, typografie, donkere modus), dan `base.css`, `layout.css`,
+`components.css`, `review.css` en `pages.css`. Een later bestand verfijnt, maar draait niets
+terug wat eerder is afgesproken.
 
 Onder `/bronnen` kunnen beheerders vaste GitHub Actions-workflows starten: de dagelijkse
 pipeline, een gratis preview of betaalde AI-herbeoordeling, cleanup en de bestaande weekmail.
