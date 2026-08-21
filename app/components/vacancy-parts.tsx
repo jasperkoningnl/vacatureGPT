@@ -1,4 +1,5 @@
 import { formatDate } from "@/lib/date-format";
+import { compactSalaryOriginal } from "@/lib/salary-display";
 import { METADATA_ONLY_ASSESSMENT_NOTICE, METADATA_ONLY_BADGE } from "@/lib/vacancy-depth";
 
 export type VacancyDetailData = {
@@ -14,7 +15,7 @@ export const verdictLabels = { interesting: "Interessant", maybe: "Misschien", n
 const currency = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
 export function salaryText(vacancy: VacancyDetailData) {
-  if (!vacancy.salaryMin) return vacancy.salaryOriginal || "Niet vermeld";
+  if (!vacancy.salaryMin) return compactSalaryOriginal(vacancy.salaryOriginal) || "Niet vermeld";
   const range = vacancy.salaryMax && vacancy.salaryMax !== vacancy.salaryMin ? `${currency.format(vacancy.salaryMin)} – ${currency.format(vacancy.salaryMax)}` : currency.format(vacancy.salaryMin);
   const details = [vacancy.salaryPeriod, vacancy.salaryBasisHours ? `op basis van ${vacancy.salaryBasisHours} uur` : null].filter(Boolean).join(", ");
   return details ? `${range} (${details})` : range;

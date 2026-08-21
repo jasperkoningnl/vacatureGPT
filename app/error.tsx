@@ -11,6 +11,6 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
     <h1>Deze pagina kon niet worden geladen</h1>
     <p className="muted">Meestal is dit tijdelijk. Probeer het opnieuw; blijft het misgaan, kijk dan in de serverlogboeken.</p>
     {error.digest && <p className="muted">Foutcode: {error.digest}</p>}
-    <div className="actions"><button onClick={reset}>Opnieuw proberen</button><Link className="button secondary" href="/">Naar mijn selectie</Link></div>
+    <div className="actions"><button onClick={reset}>Opnieuw proberen</button><Link className="button secondary" href="/">Naar deze week</Link></div>
   </section>;
 }

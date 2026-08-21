@@ -1,5 +1,6 @@
 import "./globals.css";
 import { SiteNav } from "./components/site-nav";
+import { brand } from "@/lib/brand";
 
 export const metadata = {
   title: { default: "Deze week · VacatureGPT", template: "%s · VacatureGPT" },
@@ -7,9 +8,10 @@ export const metadata = {
   applicationName: "VacatureGPT",
   robots: { index: false, follow: false },
 };
+/** De browserchrome krijgt dezelfde papierkleur als de pagina, in beide standen. */
 export const viewport = { width: "device-width", initialScale: 1, themeColor: [
-  { media: "(prefers-color-scheme: light)", color: "#f6f5f1" },
-  { media: "(prefers-color-scheme: dark)", color: "#17201c" },
+  { media: "(prefers-color-scheme: light)", color: brand.light.paper },
+  { media: "(prefers-color-scheme: dark)", color: brand.dark.paper },
 ] };
 
 export default function Layout({ children }: { children: React.ReactNode }) {

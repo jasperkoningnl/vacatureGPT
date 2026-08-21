@@ -34,23 +34,29 @@
 .queue-card-head h1 { font-size: clamp(1.75rem, 3.5vw, 2.25rem); margin-bottom: var(--s2); }
 
 /* Feiten als losse blokjes: sneller te scannen dan een tabel, ook op een telefoon. */
-.fact-chips { display: flex; flex-wrap: wrap; gap: var(--s2); margin-block: var(--s4) var(--s3); }
+.fact-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--s2);
+  margin-block: var(--s4) var(--s3);
+}
 .fact-chips > div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: var(--s2) var(--s3); }
 .fact-chips dt { color: var(--muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .06em; }
-.fact-chips dd { font-size: var(--text-sm); font-weight: 600; }
+.fact-chips dd { font-size: var(--text-sm); font-weight: 600; margin-top: var(--s1); }
 
 .queue-ai { border-left: 3px solid var(--accent); }
 .queue-ai h2 { font-size: 1.25rem; margin-bottom: var(--s3); }
 
-.queue-text {
-  margin-top: var(--s4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
+/* De vacaturetekst leest als een artikel, niet als een venster met een scrollbalk erin. */
+.queue-text { margin-top: var(--s5); border-top: 1px solid var(--line); }
+.queue-text > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+  padding: var(--s3) 0;
+  list-style-position: inside;
 }
-.queue-text > summary { cursor: pointer; font-weight: 600; padding: var(--s3) var(--s4); color: var(--accent); }
-.queue-text[open] > summary { border-bottom: 1px solid var(--line); }
-.queue-text .vacancy-content { padding: var(--s4); max-height: 32rem; overflow-y: auto; }
+.queue-text .vacancy-content { padding-bottom: var(--s4); }
 
 /* De beslisbalk blijft in beeld: je hoeft nooit terug te scrollen om te kiezen. */
 .decision-bar {
@@ -120,6 +126,7 @@
 .back-link { display: inline-block; margin-bottom: var(--s4); }
 .back-link:hover, .source-link:hover { text-decoration: underline; }
 .vacancy-detail-header h1 { margin-bottom: var(--s2); }
+.vacancy-detail-header .fact-chips { margin-bottom: var(--s3); }
 .vacancy-employer { font-family: var(--font-display); font-size: var(--text-lg); color: var(--muted); }
 .review-section { border-top: 3px solid var(--accent); }
 .tracking-section { border-top: 3px solid var(--track); }
@@ -141,9 +148,9 @@
 .ai-summary { max-width: var(--measure); }
 .ai-points { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s5); margin-top: var(--s4); }
 .ai-points h3 { font-family: var(--font-body); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: var(--s2); }
-.ai-points ul { display: grid; gap: var(--s2); }
-.ai-points li { font-size: var(--text-sm); padding-left: var(--s4); position: relative; }
-.ai-points li::before { content: "—"; position: absolute; left: 0; color: var(--muted); }
+.ai-points ul { display: grid; gap: var(--s2); padding-left: 1.15em; list-style: disc; }
+.ai-points li { font-size: var(--text-sm); padding-left: .15em; }
+.ai-points li::marker { color: var(--line-strong); }
 
 /* Het feedbackformulier op de vacaturepagina: dezelfde drie keuzes als in de rij. */
 .feedback-choices { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s3); }
@@ -191,11 +198,17 @@
 .shortlist-links { display: flex; flex-wrap: wrap; gap: var(--s3); }
 
 /* De vacaturetekst zelf leest als een artikel, niet als een formulierveld. */
-.vacancy-content { max-width: var(--measure); }
-.vacancy-content p { margin-bottom: var(--s3); }
-.vacancy-content h3 { margin-block: var(--s4) var(--s2); }
-.vacancy-content ul { display: grid; gap: var(--s1); margin-bottom: var(--s3); padding-left: var(--s4); list-style: disc; }
-.vacancy-content li { padding-left: var(--s1); }
+.vacancy-content { max-width: 100%; }
+.vacancy-content p { margin-bottom: var(--s4); }
+.vacancy-content h3 {
+  font-family: var(--font-display);
+  font-size: 1.1875rem;
+  margin-block: var(--s5) var(--s3);
+}
+.vacancy-content h3:first-child { margin-top: 0; }
+.vacancy-content ul { display: grid; gap: var(--s2); margin-bottom: var(--s4); padding-left: 1.15em; list-style: disc; }
+.vacancy-content li { padding-left: .15em; }
+.vacancy-content li::marker { color: var(--line-strong); }
 .vacancy-content-bounded { max-height: 22rem; overflow: hidden; }
 
 @media (max-width: 900px) {

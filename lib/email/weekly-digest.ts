@@ -1,4 +1,5 @@
 import { scoreToVerdict, type Verdict } from "../ai/vacancy-assessment";
+import { brand } from "../brand";
 import { deadlineSentence } from "../deadline";
 
 export const WEEKLY_DIGEST_LIMIT = 15;
@@ -51,8 +52,6 @@ export function normalizeBaseUrl(value: string) {
   return url.href.replace(/\/$/, "");
 }
 
-const PALETTE = { ink: "#202923", muted: "#626d66", line: "#d6dcd7", accent: "#1f6145", paper: "#f6f5f1", surface: "#ffffff" };
-
 function factLine(vacancy: DigestVacancy) {
   return [vacancy.location, hours(vacancy), salary(vacancy)].filter((value): value is string => Boolean(value)).join(" · ");
 }
@@ -65,33 +64,34 @@ function factLine(vacancy: DigestVacancy) {
  */
 export function buildWeeklyDigest(vacancies: DigestVacancy[], baseUrl: string, now: Date = new Date()) {
   const root = normalizeBaseUrl(baseUrl);
+  const palette = brand.light;
   const count = vacancies.length;
   const noun = count === 1 ? "vacature" : "vacatures";
   const subject = `VacatureGPT — ${count} nieuwe ${noun} deze week`;
-  const button = `display:inline-block;background:${PALETTE.accent};color:#fff;padding:13px 20px;text-decoration:none;border-radius:4px;font-weight:700`;
+  const button = `display:inline-block;background:${palette.accent};color:#fff;padding:13px 20px;text-decoration:none;border-radius:${brand.radius.small};font-weight:700`;
 
   const cards = vacancies.map((vacancy) => {
     const facts = factLine(vacancy);
     const closing = deadlineSentence(vacancy.deadline, now);
-    return `<div style="background:${PALETTE.surface};border:1px solid ${PALETTE.line};border-radius:6px;padding:18px 20px;margin:0 0 12px">`
-      + `<h2 style="font-family:Georgia,serif;font-size:19px;line-height:1.25;margin:0 0 4px">${escapeHtml(vacancy.title)}</h2>`
+    return `<div style="background:${palette.surface};border:1px solid ${palette.line};border-radius:${brand.radius.medium};padding:18px 20px;margin:0 0 12px">`
+      + `<h2 style="font-family:${brand.fontDisplay};font-size:19px;line-height:1.25;margin:0 0 4px">${escapeHtml(vacancy.title)}</h2>`
       + `<p style="margin:0 0 6px;font-weight:700">${escapeHtml(vacancy.employer)}</p>`
-      + (facts ? `<p style="color:${PALETTE.muted};margin:0 0 6px;font-size:14px">${escapeHtml(facts)}</p>` : "")
-      + (closing ? `<p style="color:${PALETTE.muted};margin:0 0 12px;font-size:14px">${escapeHtml(closing)}</p>` : "")
-      + `<a href="${root}/vacatures/${vacancy.id}" style="color:${PALETTE.accent};font-weight:700;text-decoration:none">Vacature openen →</a>`
+      + (facts ? `<p style="color:${palette.muted};margin:0 0 6px;font-size:14px">${escapeHtml(facts)}</p>` : "")
+      + (closing ? `<p style="color:${palette.muted};margin:0 0 12px;font-size:14px">${escapeHtml(closing)}</p>` : "")
+      + `<a href="${root}/vacatures/${vacancy.id}" style="color:${palette.accent};font-weight:700;text-decoration:none">Vacature openen →</a>`
       + `</div>`;
   }).join("");
 
-  const html = `<!doctype html><html lang="nl"><body style="margin:0;background:${PALETTE.paper};font-family:Arial,Helvetica,sans-serif;color:${PALETTE.ink};line-height:1.55">`
+  const html = `<!doctype html><html lang="nl"><body style="margin:0;background:${palette.paper};font-family:${brand.fontBody};color:${palette.ink};line-height:1.6">`
     + `<div style="max-width:640px;margin:auto;padding:28px 20px 40px">`
-    + `<p style="color:${PALETTE.accent};font-size:12px;letter-spacing:.11em;text-transform:uppercase;font-weight:700;margin:0 0 8px">VacatureGPT · deze week</p>`
-    + `<h1 style="font-family:Georgia,serif;font-size:28px;line-height:1.15;margin:0 0 10px">${count} kansrijke ${noun} deze week</h1>`
-    + `<p style="color:${PALETTE.muted};margin:0 0 20px">Loop ze één voor één langs. Wat je interessant vindt gaat meteen naar je shortlist, twijfelgevallen bewaar je voor later en wat niet past leg je weg met een reden.</p>`
+    + `<p style="color:${palette.accent};font-size:13px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin:0 0 8px">VacatureGPT · deze week</p>`
+    + `<h1 style="font-family:${brand.fontDisplay};font-size:28px;line-height:1.15;margin:0 0 10px">${count} kansrijke ${noun} deze week</h1>`
+    + `<p style="color:${palette.muted};margin:0 0 20px">Loop ze één voor één langs. Wat je interessant vindt gaat meteen naar je shortlist, twijfelgevallen bewaar je voor later en wat niet past leg je weg met een reden.</p>`
     + `<p style="margin:0 0 28px"><a href="${root}/beoordelen" style="${button}">Beoordeel ze één voor één</a></p>`
     + cards
-    + `<p style="margin:26px 0 0;color:${PALETTE.muted};font-size:14px">`
-    + `<a href="${root}/vacatures" style="color:${PALETTE.accent}">Blader door alle vacatures</a> · `
-    + `<a href="${root}/shortlist" style="color:${PALETTE.accent}">Bekijk je shortlist</a></p>`
+    + `<p style="margin:26px 0 0;color:${palette.muted};font-size:14px">`
+    + `<a href="${root}/vacatures" style="color:${palette.accent}">Blader door alle vacatures</a> · `
+    + `<a href="${root}/shortlist" style="color:${palette.accent}">Bekijk je shortlist</a></p>`
     + `</div></body></html>`;
 
   const text = [
