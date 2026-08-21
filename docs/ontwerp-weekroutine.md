@@ -74,6 +74,42 @@ dezelfde filters als het formulier eronder, dat nu is ingeklapt tot je het nodig
 heeft een knop naar de beoordeelrij voor die ene vacature (`/beoordelen?ids=…`), zodat markeren
 buiten de weekstapel dezelfde handeling is als erbinnen.
 
+## De vacaturetekst zelf
+
+Bij het inlezen haalt elke parser de HTML door `\s+ → " "`, waardoor alinea's, koppen en
+opsommingen verdwijnen vóór er iets is opgeslagen. Wat er in de database staat is dus vrijwel altijd
+één lap van duizenden tekens — onleesbaar, hoe je hem ook opmaakt.
+
+`formatVacancyContent` wint die structuur bij het tonen terug. Alleen alinea's die langer zijn dan
+600 tekens krijgen die behandeling, dus tekst die een bron wél netjes aanleverde blijft ongemoeid.
+Binnen zo'n lap wordt geknipt op bekende Nederlandse sectiekopjes ("Wat je gaat doen", "Wij bieden",
+"Solliciteren") en daarna op zinsgrenzen tot alinea's van leesbare lengte.
+
+Twee regels houden dat eerlijk:
+
+- **Er gaat geen teken verloren.** Elk blok is een `slice` van de bron; samengevoegd is het exact
+  dezelfde tekst. Een test bewaakt dat, want de eerste versie liet `€ 7.491` als `491` overblijven.
+- **Een verkeerd geplaatste kop is erger dan een gemiste.** Er wordt alleen geknipt als er een
+  hoofdletter achteraan komt — daardoor blijft "Wij bieden een uitdagende functie" één zin, terwijl
+  "Wij bieden Een brutomaandsalaris van" alleen zo kan lezen doordat er een kopgrens wegviel. Korte
+  naamwoordelijke groepen als "Het team" of "De functie" staan bewust niet in de lijst: daar volgt
+  vaak een eigennaam ("Het team Regie speelt daarin een cruciale rol").
+
+Dit repareert wat er nu in de database staat. De structurele oplossing zit een laag dieper: laat de
+parsers de blokstructuur bewaren in plaats van hem weg te wassen. Dat raakt de opgeslagen
+`contentHash` niet — die gaat over `rawData` — en kost dus geen herbeoordeling, maar helpt pas
+zodra een vacature opnieuw wordt ingelezen.
+
+## De volgorde op de vacaturepagina
+
+Eerst de feiten, dan het AI-advies, dan de vacaturetekst, en pas daarna jouw oordeel en je
+vervolgstap. De vorige indeling vroeg om een oordeel voordat je iets had kunnen zien. Snel oordelen
+doe je in de beoordeelrij; deze pagina is om te lezen.
+
+Het salarisveld toont niet langer de hele brontekst wanneer de parser geen bedrag kon herleiden:
+`compactSalaryOriginal` houdt de zin over die het bedrag draagt en knipt af op een woordgrens. Er
+wordt niets afgeleid of afgerond — wat er staat, staat er, alleen korter.
+
 ## Vormgeving
 
 De visuele taal bleef: papier, haarlijnen, Georgia-koppen, één groen accent. Wat veranderde:
@@ -92,6 +128,11 @@ De visuele taal bleef: papier, haarlijnen, Georgia-koppen, één groen accent. W
   secundair; alleen wat je dagelijks doet krijgt een gevulde knop.
 - **Smalle schermen.** De tabel schuift horizontaal in plaats van te wringen, de navigatie
   schuift per groep, en de drie keuzeknoppen blijven op één rij zonder hun uitleg.
+- **De vacaturetekst is geen venster in een venster.** De uitklap in de beoordeelrij had een eigen
+  kader met scrollbalk, terwijl de tekst binnen dat kader op leesbreedte stopte en de rechterhelft
+  leeg liet. Nu is het een gewone uitklap zonder kader en zonder eigen scrollgebied.
+- **Opsommingen krijgen een opsommingsteken.** De pluspunten van de AI stonden achter een kastlijntje
+  dat als een streepje van het model las; dat is nu een gewone stip.
 
 ## Wat bewust niet is veranderd
 
