@@ -7,8 +7,8 @@ en gebruikt feedback om volgende beoordelingen beter te kalibreren. De interface
 daarnaast een persoonlijke selectie, shortlist, sollicitatietracking, bronbeheer en een
 optionele wekelijkse e-mail.
 
-> **Projectdoorlichting:** zie [de volledige analyse van techniek, functionaliteit,
-> vormgeving en gebruiksvriendelijkheid](docs/analyse-2026-08-20.md), inclusief
+> **Projectdoorlichting:** zie [de actuele volledige analyse van techniek, functionaliteit,
+> vormgeving en gebruiksvriendelijkheid](docs/analyse-2026-08-21.md), inclusief
 > geprioriteerde verbetervoorstellen en ideeën voor nieuwe functionaliteit.
 > De interactie en vormgeving zijn daarna herzien rond één weekroutine; die keuzes staan in
 > [het ontwerpdocument](docs/ontwerp-weekroutine.md).
