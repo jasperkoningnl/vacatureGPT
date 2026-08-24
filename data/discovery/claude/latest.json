@@ -1,1 +1,44 @@
-{"run_date":"2026-08-21","postings":[{"company":"Natuurmonumenten","title":"Hoofdredacteur","location":"Amersfoort","remote_policy":"unknown","hours":"","salary":"","posted_date":"","source":"other","source_url":"https://www.villamedia.nl/vacatures/functie/hoofdredacteur-20f","direct_url":null,"first_seen":"2026-08-21"},{"company":"Talpa TV Productions B.V.","title":"Eindredacteur Hart van Nederland","location":"Hilversum","remote_policy":"unknown","hours":"","salary":"","posted_date":"","source":"other","source_url":"https://www.villamedia.nl/vacatures/functie/eindredacteur-hart-van-nederland","direct_url":"https://jobs.talpanetwork.com/o/eindredacteur-hart-van-nederland","first_seen":"2026-08-21"},{"company":"Koninklijke Jaarbeurs","title":"Hoofdredacteur Tech","location":"Utrecht","remote_policy":"unknown","hours":"","salary":"","posted_date":"","source":"other","source_url":"https://werkenbij.jaarbeurs.nl/o/hoofdredacteur-tech","direct_url":"https://werkenbij.jaarbeurs.nl/o/hoofdredacteur-tech","first_seen":"2026-08-21"}]}
+{
+  "run_date": "2026-08-24",
+  "postings": [
+    {
+      "company": "Rijksdienst voor het Cultureel Erfgoed",
+      "title": "Eindredacteur Tijdschrift",
+      "location": "Amersfoort",
+      "remote_policy": "unknown",
+      "hours": "36",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://www.werkenvoornederland.nl/vacatures/eindredacteur-tijdschrift-OCW-2026-5041",
+      "direct_url": "https://www.werkenvoornederland.nl/vacatures/eindredacteur-tijdschrift-OCW-2026-5041",
+      "first_seen": "2026-08-24"
+    },
+    {
+      "company": "RTV Utrecht",
+      "title": "Bureauredacteur online (32-36 uur)",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "32-36",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://werkenbijrtvutrecht.nl/o/bureauredacteur-32-36-uur-online",
+      "direct_url": "https://werkenbijrtvutrecht.nl/o/bureauredacteur-32-36-uur-online",
+      "first_seen": "2026-08-24"
+    },
+    {
+      "company": "Salta Group",
+      "title": "Webredacteur",
+      "location": "Hilversum",
+      "remote_policy": "hybrid",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://careers.saltagroup.com/vacatures/marketing/webredacteur-1248676",
+      "direct_url": "https://careers.saltagroup.com/vacatures/marketing/webredacteur-1248676",
+      "first_seen": "2026-08-24"
+    }
+  ]
+}
