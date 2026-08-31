@@ -1,1 +1,31 @@
-{"run_date":"2026-08-28","postings":[{"company":"RTV Utrecht","title":"Eindredacteur","location":"Utrecht","remote_policy":"unknown","hours":"","salary":"","posted_date":"","source":"other","source_url":"https://www.villamedia.nl/vacatures/functie/eindredacteur-died8rfvu","direct_url":null,"first_seen":"2026-08-28"},{"company":"Waterschap Vallei en Veluwe","title":"Teamleider Communicatie","location":"Apeldoorn","remote_policy":"hybrid","hours":"32-36","salary":"max €7.417 bruto per maand (schaal 12, 36 uur)","posted_date":"","source":"other","source_url":"https://www.villamedia.nl/vacatures/functie/teamleider-communicatie-1259","direct_url":"https://www.werkenbijvallei-veluwe.nl/vacatures/1296635-teamleider-communicatie/","first_seen":"2026-08-28"}]}
+{
+  "run_date": "2026-08-31",
+  "postings": [
+    {
+      "company": "Natuurmonumenten",
+      "title": "Content Specialist, Merk en Positionering",
+      "location": "",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://www.natuurmonumenten.nl/provincies/utrecht/vacatures/vacature-content-specialist-merk-en-positionering",
+      "direct_url": "https://www.natuurmonumenten.nl/provincies/utrecht/vacatures/vacature-content-specialist-merk-en-positionering",
+      "first_seen": "2026-08-31"
+    },
+    {
+      "company": "RTV Utrecht",
+      "title": "Allround Redacteur",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://www.villamedia.nl/vacatures/functie/allround-redacteur89790",
+      "direct_url": null,
+      "first_seen": "2026-08-31"
+    }
+  ]
+}
