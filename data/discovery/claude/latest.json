@@ -1,31 +1,57 @@
 {
-  "run_date": "2026-08-31",
+  "run_date": "2026-09-01",
   "postings": [
     {
       "company": "Natuurmonumenten",
-      "title": "Content Specialist, Merk en Positionering",
-      "location": "",
+      "title": "Contentspecialist",
+      "location": "Amersfoort",
       "remote_policy": "unknown",
       "hours": "",
       "salary": "",
       "posted_date": "",
       "source": "other",
-      "source_url": "https://www.natuurmonumenten.nl/provincies/utrecht/vacatures/vacature-content-specialist-merk-en-positionering",
-      "direct_url": "https://www.natuurmonumenten.nl/provincies/utrecht/vacatures/vacature-content-specialist-merk-en-positionering",
-      "first_seen": "2026-08-31"
+      "source_url": "https://www.villamedia.nl/vacatures/functie/contentspecialist-05x",
+      "direct_url": null,
+      "first_seen": "2026-09-01"
     },
     {
-      "company": "RTV Utrecht",
-      "title": "Allround Redacteur",
-      "location": "Utrecht",
+      "company": "Gemeente Amersfoort",
+      "title": "Contentspecialist",
+      "location": "Amersfoort",
       "remote_policy": "unknown",
       "hours": "",
       "salary": "",
       "posted_date": "",
       "source": "other",
-      "source_url": "https://www.villamedia.nl/vacatures/functie/allround-redacteur89790",
+      "source_url": "https://www.8baan.nl/vacature/contentspecialist-20",
       "direct_url": null,
-      "first_seen": "2026-08-31"
+      "first_seen": "2026-09-01"
+    },
+    {
+      "company": "Uitgeverij Zomer & Keuning",
+      "title": "Internationaal Acquirerend Redacteur Fictie",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "32-36 uur",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://boekblad.nl/Vacatures/Item/uitgeverij-z-k-zoekt-een-internationaal-acquirerend-redacteur-fictie",
+      "direct_url": null,
+      "first_seen": "2026-09-01"
+    },
+    {
+      "company": "De Rechtspraak",
+      "title": "Redacteur Engelse content",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "fulltime",
+      "salary": "€3.404 - €5.390",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://magnet.me/nl-NL/vacature/1032352/redacteur-engelse-content",
+      "direct_url": null,
+      "first_seen": "2026-09-01"
     }
   ]
 }
