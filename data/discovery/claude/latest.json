@@ -1,1 +1,31 @@
-{"run_date":"2026-09-11","postings":[{"company":"Springer Nature","title":"Eindredacteur","location":"Utrecht","remote_policy":"hybrid","hours":"36","salary":"","posted_date":"","source":"other","source_url":"https://www.evenbreak.com/job/1466393/eindredacteur/?TrackID=10","direct_url":null,"first_seen":"2026-09-11"},{"company":"Jacobs Douwe Egberts","title":"Digital Content Marketing Specialist","location":"Utrecht","remote_policy":"unknown","hours":"","salary":"","posted_date":"","source":"other","source_url":"https://startup.jobs/digital-content-marketing-specialist-jacobs-douwe-egberts-2172884","direct_url":null,"first_seen":"2026-09-11"}]}
+{
+  "run_date": "2026-09-14",
+  "postings": [
+    {
+      "company": "RTV Utrecht",
+      "title": "Redacteur/Verslaggever team social media en nieuws",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "32-36",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://www.villamedia.nl/vacatures/functie/redacteur-verslaggever-team-social-media-en-nieuws",
+      "direct_url": null,
+      "first_seen": "2026-09-14"
+    },
+    {
+      "company": "Salta Group",
+      "title": "Content Communicatie Specialist",
+      "location": "Hilversum",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://vacatures-hilversum.nl/vacature/content-communicatie-specialist-salta-group-hilversum/",
+      "direct_url": null,
+      "first_seen": "2026-09-14"
+    }
+  ]
+}
