@@ -1,31 +1,44 @@
 {
-  "run_date": "2026-09-14",
+  "run_date": "2026-09-15",
   "postings": [
     {
-      "company": "RTV Utrecht",
-      "title": "Redacteur/Verslaggever team social media en nieuws",
+      "company": "Springer Nature",
+      "title": "Redacteur cross mediaal",
       "location": "Utrecht",
       "remote_policy": "unknown",
-      "hours": "32-36",
-      "salary": "",
+      "hours": "24-36 uur",
+      "salary": "€3.966,81 - €5.548,29 bruto per maand (schaal H, 36 uur)",
       "posted_date": "",
       "source": "other",
-      "source_url": "https://www.villamedia.nl/vacatures/functie/redacteur-verslaggever-team-social-media-en-nieuws",
+      "source_url": "https://www.evenbreak.com/job/1444632/redacteur-cross-mediaal/?TrackID=10",
       "direct_url": null,
-      "first_seen": "2026-09-14"
+      "first_seen": "2026-09-15"
     },
     {
-      "company": "Salta Group",
-      "title": "Content Communicatie Specialist",
-      "location": "Hilversum",
+      "company": "Rijksdienst voor Ondernemend Nederland (RVO)",
+      "title": "(Eind)redacteur",
+      "location": "Utrecht",
       "remote_policy": "unknown",
+      "hours": "32-36 uur",
+      "salary": "",
+      "posted_date": "2026-05-19",
+      "source": "other",
+      "source_url": "https://www.werkenvoornederland.nl/vacatures/eind-redacteur-RVO-2026-6868",
+      "direct_url": "https://www.werkenvoornederland.nl/vacatures/eind-redacteur-RVO-2026-6868",
+      "first_seen": "2026-09-15"
+    },
+    {
+      "company": "RTL Nederland B.V.",
+      "title": "Data / Distributie Redacteur RTL Nieuws",
+      "location": "Hilversum",
+      "remote_policy": "on-site",
       "hours": "",
       "salary": "",
-      "posted_date": "",
+      "posted_date": "2026-06-08",
       "source": "other",
-      "source_url": "https://vacatures-hilversum.nl/vacature/content-communicatie-specialist-salta-group-hilversum/",
-      "direct_url": null,
-      "first_seen": "2026-09-14"
+      "source_url": "https://www.villamedia.nl/vacatures/functie/data-distributie-redacteur-rtl-nieuws-25",
+      "direct_url": "https://rtl.recruitee.com/o/data-distributie-redacteur-rtl-nieuws",
+      "first_seen": "2026-09-15"
     }
   ]
 }
