@@ -1,18 +1,83 @@
 {
-  "run_date": "2026-09-18",
+  "run_date": "2026-09-21",
   "postings": [
     {
-      "company": "EO",
-      "title": "Projectleider Communicatie (medior)",
-      "location": "Hilversum",
+      "company": "Noordhoff",
+      "title": "Content Marketeer (Utrecht en/of Groningen)",
+      "location": "Utrecht en/of Groningen",
       "remote_policy": "unknown",
-      "hours": "36 uur",
-      "salary": "€3.153 - €4.960 bruto per maand (schaal G, o.b.v. 36 uur, medior, 1-jarig contract)",
+      "hours": "",
+      "salary": "",
       "posted_date": "",
       "source": "other",
-      "source_url": "https://over.eo.nl/werken-bij/vacatures/projectleider-communicatie-medior-1",
-      "direct_url": "https://over.eo.nl/werken-bij/vacatures/projectleider-communicatie-medior-1",
-      "first_seen": "2026-09-18"
+      "source_url": "https://werkenbijnoordhoff.nl/vacature/content-marketeer-utrecht-en-of-groningen-1170040/",
+      "direct_url": "https://werkenbijnoordhoff.nl/vacature/content-marketeer-utrecht-en-of-groningen-1170040/",
+      "first_seen": "2026-09-21"
+    },
+    {
+      "company": "Jaarbeurs",
+      "title": "Hoofdredacteur Public",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://werkenbij.jaarbeurs.nl/o/hoofdredacteur-public?lang=nl",
+      "direct_url": "https://werkenbij.jaarbeurs.nl/o/hoofdredacteur-public?lang=nl",
+      "first_seen": "2026-09-21"
+    },
+    {
+      "company": "Jaarbeurs",
+      "title": "Hoofdredacteur Bouw & Installatie",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://werkenbij.jaarbeurs.nl/o/hoofdredacteur-bouw-installatie?lang=nl",
+      "direct_url": "https://werkenbij.jaarbeurs.nl/o/hoofdredacteur-bouw-installatie?lang=nl",
+      "first_seen": "2026-09-21"
+    },
+    {
+      "company": "Jaarbeurs",
+      "title": "Hoofdredacteur ICT",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://werkenbij.jaarbeurs.nl/o/hoofdredacteur-ict?lang=nl",
+      "direct_url": "https://werkenbij.jaarbeurs.nl/o/hoofdredacteur-ict?lang=nl",
+      "first_seen": "2026-09-21"
+    },
+    {
+      "company": "Jaarbeurs",
+      "title": "Redacteur Public (zorg en onderwijs)",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://werkenbij.jaarbeurs.nl/l/en/o/redacteurpublic",
+      "direct_url": "https://werkenbij.jaarbeurs.nl/l/en/o/redacteurpublic",
+      "first_seen": "2026-09-21"
+    },
+    {
+      "company": "Jaarbeurs",
+      "title": "Head of content Zorg & Onderwijs",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://werkenbij.jaarbeurs.nl/l/en/o/head-of-content-zorg-onderwijs",
+      "direct_url": "https://werkenbij.jaarbeurs.nl/l/en/o/head-of-content-zorg-onderwijs",
+      "first_seen": "2026-09-21"
     }
   ]
 }
