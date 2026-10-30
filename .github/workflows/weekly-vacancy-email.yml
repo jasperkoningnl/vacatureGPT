@@ -2,9 +2,8 @@ name: Weekly vacancy email
 
 on:
   workflow_dispatch:
-  schedule:
-    # Tuesday 07:00 UTC, 1 hour and 45 minutes after the daily pipeline starts.
-    - cron: "0 7 * * 2"
+  # Tijdelijk gepauzeerd op 2026-10-30, tegelijk met de dagelijkse pipeline.
+  # Herstel de schedule-trigger wanneer het zoeken wordt hervat.
 
 permissions:
   contents: read
