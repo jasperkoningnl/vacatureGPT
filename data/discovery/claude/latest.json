@@ -1,1 +1,44 @@
-{"run_date":"2026-11-09","postings":[]}
+{
+  "run_date": "2026-11-10",
+  "postings": [
+    {
+      "company": "Rabobank",
+      "title": "Global Content & Editorial Lead",
+      "location": "Utrecht",
+      "remote_policy": "unknown",
+      "hours": "36 uur",
+      "salary": "EUR 5.994 - 8.563 bruto per maand",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://www.banken.nl/vacatures/46627/rabobank/global-content-editorial-lead",
+      "direct_url": null,
+      "first_seen": "2026-11-10"
+    },
+    {
+      "company": "OS Studios",
+      "title": "Senior Content Manager",
+      "location": "Hilversum",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "",
+      "source": "other",
+      "source_url": "https://www.jobbird.com/nl/vacature/25019941-senior-content-manager",
+      "direct_url": null,
+      "first_seen": "2026-11-10"
+    },
+    {
+      "company": "Scala",
+      "title": "Hoofdredacteur Railhobby",
+      "location": "Amersfoort",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "2026-05-26",
+      "source": "other",
+      "source_url": "https://magnet.me/nl-NL/vacature/1039958/hoofdredacteur-railhobby",
+      "direct_url": null,
+      "first_seen": "2026-11-10"
+    }
+  ]
+}
