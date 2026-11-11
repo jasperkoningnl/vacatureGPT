@@ -1,44 +1,57 @@
 {
-  "run_date": "2026-11-10",
+  "run_date": "2026-11-11",
   "postings": [
     {
-      "company": "Rabobank",
-      "title": "Global Content & Editorial Lead",
-      "location": "Utrecht",
+      "company": "Noordhoff",
+      "title": "Redacteur Vormgeving & Productie – Moderne Vreemde Talen Bovenbouw",
+      "location": "",
       "remote_policy": "unknown",
-      "hours": "36 uur",
-      "salary": "EUR 5.994 - 8.563 bruto per maand",
-      "posted_date": "",
+      "hours": "",
+      "salary": "€3.600 - €5.000 per maand",
+      "posted_date": "2026-07-09",
       "source": "other",
-      "source_url": "https://www.banken.nl/vacatures/46627/rabobank/global-content-editorial-lead",
+      "source_url": "https://magnet.me/nl-NL/vacature/1056771/redacteur-vormgeving---productie--moderne-vreemde-talen-bovenbouw",
       "direct_url": null,
-      "first_seen": "2026-11-10"
+      "first_seen": "2026-11-11"
     },
     {
-      "company": "OS Studios",
-      "title": "Senior Content Manager",
-      "location": "Hilversum",
+      "company": "Noordhoff",
+      "title": "Educatieve Content Ontwikkelaar – VO",
+      "location": "",
+      "remote_policy": "unknown",
+      "hours": "",
+      "salary": "",
+      "posted_date": "2026-08-06",
+      "source": "other",
+      "source_url": "https://magnet.me/nl-NL/vacature/1065862/educatieve-content-ontwikkelaar--vo",
+      "direct_url": null,
+      "first_seen": "2026-11-11"
+    },
+    {
+      "company": "123inkt",
+      "title": "Teamlead Content",
+      "location": "",
       "remote_policy": "unknown",
       "hours": "",
       "salary": "",
       "posted_date": "",
       "source": "other",
-      "source_url": "https://www.jobbird.com/nl/vacature/25019941-senior-content-manager",
+      "source_url": "https://magnet.me/nl-NL/vacature/1044529/teamlead-content",
       "direct_url": null,
-      "first_seen": "2026-11-10"
+      "first_seen": "2026-11-11"
     },
     {
-      "company": "Scala",
-      "title": "Hoofdredacteur Railhobby",
-      "location": "Amersfoort",
+      "company": "Rentman",
+      "title": "Content Manager",
+      "location": "",
       "remote_policy": "unknown",
       "hours": "",
       "salary": "",
-      "posted_date": "2026-05-26",
+      "posted_date": "2026-06-16",
       "source": "other",
-      "source_url": "https://magnet.me/nl-NL/vacature/1039958/hoofdredacteur-railhobby",
+      "source_url": "https://magnet.me/nl-NL/vacature/1049261/content-manager",
       "direct_url": null,
-      "first_seen": "2026-11-10"
+      "first_seen": "2026-11-11"
     }
   ]
 }
