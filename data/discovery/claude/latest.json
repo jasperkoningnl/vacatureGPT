@@ -1,57 +1,31 @@
 {
-  "run_date": "2026-11-11",
+  "run_date": "2026-11-12",
   "postings": [
     {
-      "company": "Noordhoff",
-      "title": "Redacteur Vormgeving & Productie – Moderne Vreemde Talen Bovenbouw",
-      "location": "",
+      "company": "NOS",
+      "title": "Eindredacteur NOS 24 uur",
+      "location": "Hilversum",
       "remote_policy": "unknown",
-      "hours": "",
-      "salary": "€3.600 - €5.000 per maand",
-      "posted_date": "2026-07-09",
+      "hours": "32-36 uur per week",
+      "salary": "cao-contract I max. €6.103",
+      "posted_date": "2026-06-29",
       "source": "other",
-      "source_url": "https://magnet.me/nl-NL/vacature/1056771/redacteur-vormgeving---productie--moderne-vreemde-talen-bovenbouw",
+      "source_url": "https://magnet.me/nl-NL/vacature/1053329/eindredacteur-nos-24-uur",
       "direct_url": null,
-      "first_seen": "2026-11-11"
+      "first_seen": "2026-11-12"
     },
     {
-      "company": "Noordhoff",
-      "title": "Educatieve Content Ontwikkelaar – VO",
+      "company": "BNNVARA",
+      "title": "Redacteur Dijkstra & Evenblij Ter Plekke",
       "location": "",
       "remote_policy": "unknown",
       "hours": "",
       "salary": "",
-      "posted_date": "2026-08-06",
+      "posted_date": "2026-09-24",
       "source": "other",
-      "source_url": "https://magnet.me/nl-NL/vacature/1065862/educatieve-content-ontwikkelaar--vo",
-      "direct_url": null,
-      "first_seen": "2026-11-11"
-    },
-    {
-      "company": "123inkt",
-      "title": "Teamlead Content",
-      "location": "",
-      "remote_policy": "unknown",
-      "hours": "",
-      "salary": "",
-      "posted_date": "",
-      "source": "other",
-      "source_url": "https://magnet.me/nl-NL/vacature/1044529/teamlead-content",
-      "direct_url": null,
-      "first_seen": "2026-11-11"
-    },
-    {
-      "company": "Rentman",
-      "title": "Content Manager",
-      "location": "",
-      "remote_policy": "unknown",
-      "hours": "",
-      "salary": "",
-      "posted_date": "2026-06-16",
-      "source": "other",
-      "source_url": "https://magnet.me/nl-NL/vacature/1049261/content-manager",
-      "direct_url": null,
-      "first_seen": "2026-11-11"
+      "source_url": "https://www.bnnvara.nl/werkenbij/artikelen/redacteur-dijkstra-evenblij-ter-plekke",
+      "direct_url": "https://www.bnnvara.nl/werkenbij/artikelen/redacteur-dijkstra-evenblij-ter-plekke",
+      "first_seen": "2026-11-12"
     }
   ]
 }
